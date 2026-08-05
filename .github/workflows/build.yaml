@@ -1,0 +1,161 @@
+name: Build HDR & Upscale Manager
+
+on:
+  push:
+    branches: [master]
+    tags: ['v*']
+  pull_request:
+    branches: [master]
+
+jobs:
+  build:
+    runs-on: windows-latest
+    permissions:
+      contents: write  # needed for softprops/action-gh-release to create the Release on v* tags
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Read version from extension.yaml
+        id: version
+        shell: pwsh
+        run: |
+          $line = Get-Content extension.yaml | Where-Object { $_ -match '^Version:\s*(.+)$' } | Select-Object -First 1
+          $ver = ($line -replace 'Version:\s*', '').Trim()
+          if ([string]::IsNullOrWhiteSpace($ver)) { throw "Could not read Version: from extension.yaml" }
+          "version=$ver" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          Write-Host "Detected version: $ver"
+
+      - name: Setup MSBuild (WPF + net462 target)
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Setup NuGet
+        uses: NuGet/setup-nuget@v2
+
+      - name: Restore (via MSBuild so PackageReference resolves the same way it will at build time)
+        run: msbuild HdrUpscaleManager.csproj /t:Restore /p:Configuration=Release
+
+      - name: Build
+        run: msbuild HdrUpscaleManager.csproj /t:Build /p:Configuration=Release
+
+      - name: Stage extension package
+        shell: pwsh
+        run: |
+          $stage = "dist/hdr-upscale-manager"
+          New-Item -ItemType Directory -Path $stage -Force | Out-Null
+          # Ship every DLL from bin/Release/net462 (PlayniteSDK is a reference-only assembly
+          # supplied by the Playnite process itself and isn't copied by MSBuild, so this
+          # excludes it automatically — good).
+          Copy-Item bin/Release/net462/*.dll $stage
+          Copy-Item extension.yaml $stage
+          if (Test-Path Resources) {
+            Copy-Item Resources $stage -Recurse
+          }
+
+      - name: Package .zip and .pext
+        shell: pwsh
+        run: |
+          $ver = "${{ steps.version.outputs.version }}"
+          $zip = "dist/hdr-upscale-manager-v$ver.zip"
+          # extension.yaml must sit at the root of the archive for Playnite's .pext installer
+          # to accept it. Compress-Archive with `path/*` puts contents at the archive root.
+          Compress-Archive -Path dist/hdr-upscale-manager/* -DestinationPath $zip -Force
+          Copy-Item $zip "dist/hdr-upscale-manager-v$ver.pext"
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: hdr-upscale-manager-v${{ steps.version.outputs.version }}
+          path: |
+            dist/hdr-upscale-manager-v${{ steps.version.outputs.version }}.zip
+            dist/hdr-upscale-manager-v${{ steps.version.outputs.version }}.pext
+
+      - name: Publish GitHub Release (on v* tag)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          name: v${{ steps.version.outputs.version }}
+          tag_name: ${{ github.ref_name }}
+          fail_on_unmatched_files: true
+          files: |
+            dist/hdr-upscale-manager-v${{ steps.version.outputs.version }}.zip
+            dist/hdr-upscale-manager-v${{ steps.version.outputs.version }}.pext
+
+      - name: Update addon_manifest.json (on v* tag)
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
+        run: |
+          $ver = "${{ steps.version.outputs.version }}"
+          $repo = "${{ github.repository }}"
+          $manifestPath = "addon_manifest.json"
+
+          # Switch to master so we can commit + push the manifest update back.
+          # The workflow was triggered by a tag push, so HEAD is detached at the tag commit —
+          # since tags are cut from master, master is at (or immediately after) that same commit.
+          git fetch origin master
+          git checkout master
+          git pull --ff-only origin master
+
+          if (-not (Test-Path $manifestPath)) {
+            throw "addon_manifest.json not found — create it first (see docs)."
+          }
+
+          $manifest = Get-Content $manifestPath -Raw | ConvertFrom-Json
+
+          # actions/checkout@v4 doesn't fetch annotated-tag objects by default — pull the
+          # tag's *object* explicitly so `%(contents)` returns the annotation body rather
+          # than falling back to the tagged commit's message.
+          git fetch origin "refs/tags/v${ver}:refs/tags/v${ver}" --force
+
+          # Take the tag's annotation as changelog — split into non-blank trimmed lines.
+          # `%(contents)` includes subject + body. Falls back to a placeholder if empty.
+          $tagMessage = (git tag -l --format='%(contents)' "v$ver") -join "`n"
+          $changelog = @(
+            $tagMessage -split "`r?`n"
+              | Where-Object { $_.Trim() }
+              | ForEach-Object { $_.Trim().TrimStart('-','*',' ').Trim() }
+          )
+          if ($changelog.Count -eq 0) {
+            $changelog = @("Release v$ver — see GitHub Releases for details.")
+          }
+
+          # Derive RequiredApiVersion from csproj so a PlayniteSDK bump propagates here too.
+          $csproj = Get-Content HdrUpscaleManager.csproj -Raw
+          $apiVer = if ($csproj -match 'PackageReference Include="PlayniteSDK" Version="([\d\.]+)"') {
+            $Matches[1]
+          } else { "6.16.0" }
+
+          $newPackage = [pscustomobject]@{
+            Version = $ver
+            RequiredApiVersion = $apiVer
+            ReleaseDate = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
+            PackageUrl = "https://github.com/$repo/releases/download/v$ver/hdr-upscale-manager-v$ver.pext"
+            Changelog = $changelog
+          }
+
+          # Replace if an entry for this version already exists (idempotent re-tag); otherwise prepend (newest first).
+          $existing = $manifest.Packages | Where-Object { $_.Version -eq $ver }
+          if ($existing) {
+            $manifest.Packages = @($manifest.Packages | ForEach-Object {
+              if ($_.Version -eq $ver) { $newPackage } else { $_ }
+            })
+          } else {
+            $manifest.Packages = @($newPackage) + @($manifest.Packages)
+          }
+
+          # Write back preserving pretty JSON. UTF-8 no-BOM on pwsh 7+.
+          $manifest | ConvertTo-Json -Depth 10 | Set-Content $manifestPath -Encoding UTF8
+
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add $manifestPath
+          # If nothing changed (idempotent re-run of the same tag), skip the commit.
+          git diff --cached --quiet
+          if ($LASTEXITCODE -eq 0) {
+            Write-Host "addon_manifest.json already up to date — no commit needed."
+          } else {
+            # [skip ci] on the auto-commit avoids triggering a redundant build.
+            git commit -m "chore(manifest): append v$ver entry [skip ci]"
+            git push origin master
+          }

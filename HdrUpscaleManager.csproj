@@ -1,0 +1,52 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net462</TargetFramework>
+    <AssemblyName>HdrUpscaleManager</AssemblyName>
+    <RootNamespace>HdrUpscaleManager</RootNamespace>
+    <UseWPF>true</UseWPF>
+    <LangVersion>latest</LangVersion>
+    <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
+    <!-- Source of truth for the plugin version is extension.yaml (that's what Playnite's
+         Add-ons UI reads). Kept in sync here so the DLL's AssemblyVersion / FileVersion
+         match what shows up in Playnite's extension logs on load. Bump both together. -->
+    <Version>0.1.0</Version>
+    <AssemblyVersion>0.1.0.0</AssemblyVersion>
+    <FileVersion>0.1.0.0</FileVersion>
+    <InformationalVersion>0.1.0</InformationalVersion>
+
+    <!-- Security guard: promote NuGet vulnerability warnings (moderate/high/critical)
+         to errors so we can't ship a build that pulls in a known-vulnerable package.
+         NU1901=Low, NU1902=Moderate, NU1903=High, NU1904=Critical. Low kept as warning. -->
+    <NuGetAudit>true</NuGetAudit>
+    <NuGetAuditMode>all</NuGetAuditMode>
+    <WarningsAsErrors>$(WarningsAsErrors);NU1902;NU1903;NU1904</WarningsAsErrors>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Official SDK NuGet package published by the Playnite team -->
+    <PackageReference Include="PlayniteSDK" Version="6.16.0" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Framework assemblies not auto-referenced by SDK-style projects on net462. -->
+    <Reference Include="System.Net.Http" />
+    <Reference Include="System.IO.Compression" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Ship this next to the DLL so Playnite's Extensions folder is self-contained -->
+    <None Include="extension.yaml" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- HdrUpscaleManager.Tests lives in a subfolder of this project's own directory —
+         without this, the default **/*.cs glob below would try to compile its test files
+         (and xunit references) into this project too. -->
+    <Compile Remove="HdrUpscaleManager.Tests\**" />
+    <EmbeddedResource Remove="HdrUpscaleManager.Tests\**" />
+    <None Remove="HdrUpscaleManager.Tests\**" />
+  </ItemGroup>
+
+</Project>

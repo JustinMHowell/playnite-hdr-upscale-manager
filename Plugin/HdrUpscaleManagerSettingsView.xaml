@@ -1,0 +1,11 @@
+<UserControl x:Class="HdrUpscaleManager.Plugin.HdrUpscaleManagerSettingsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             MinWidth="560">
+    <StackPanel Margin="20">
+        <TextBlock Text="Greeting" FontWeight="Bold" Margin="0,0,0,4"/>
+        <TextBlock Text="Shown by the 'Say hello' main-menu item."
+                   Foreground="Gray" FontSize="11" Margin="0,0,0,4" TextWrapping="Wrap"/>
+        <TextBox Text="{Binding Greeting, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,12"/>
+    </StackPanel>
+</UserControl>
