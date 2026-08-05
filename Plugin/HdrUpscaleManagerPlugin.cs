@@ -76,6 +76,13 @@ namespace HdrUpscaleManager.Plugin
 
             yield return new GameMenuItem
             {
+                Description = "Install RenoDX (matched game)",
+                MenuSection = "HDR & Upscale Manager",
+                Action = async _ => await InstallRenoDxMatchedAsync(games[0])
+            };
+
+            yield return new GameMenuItem
+            {
                 Description = "Install RenoDX (Unreal Engine, generic)",
                 MenuSection = "HDR & Upscale Manager",
                 Action = async _ => await InstallRenoDxAsync(games[0], RenoDxEngine.UnrealEngine)
@@ -105,6 +112,38 @@ namespace HdrUpscaleManager.Plugin
             catch (Exception ex)
             {
                 Log.Error(ex, $"RenoDX install failed for '{game.Name}'.");
+                PlayniteApi.Dialogs.ShowErrorMessage($"RenoDX install failed: {ex.Message}", "Install RenoDX");
+            }
+        }
+
+        private async Task InstallRenoDxMatchedAsync(Playnite.SDK.Models.Game game)
+        {
+            try
+            {
+                var manifestService = new ManifestService(GetPluginUserDataPath());
+                var manifestResult = await manifestService.FetchAsync().ConfigureAwait(false);
+                var nameOverrides = manifestResult?.Manifest?.WikiNameOverrides;
+
+                var wikiCacheDir = Path.Combine(GetPluginUserDataPath(), "RenoDxWikiCache");
+                var result = await RenoDxService
+                    .InstallForGameAsync(game.InstallDirectory, game.Name, wikiCacheDir, nameOverrides)
+                    .ConfigureAwait(false);
+
+                if (!result.Success)
+                {
+                    PlayniteApi.Dialogs.ShowErrorMessage(result.Error, "Install RenoDX");
+                    return;
+                }
+
+                var message = $"Installed RenoDX ({result.MatchedGameName}) to:\n{result.InstalledPath}";
+                if (!string.IsNullOrEmpty(result.Notes))
+                    message += $"\n\nNote: {result.Notes}";
+
+                PlayniteApi.Dialogs.ShowMessage(message, "Install RenoDX");
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, $"RenoDX matched install failed for '{game.Name}'.");
                 PlayniteApi.Dialogs.ShowErrorMessage($"RenoDX install failed: {ex.Message}", "Install RenoDX");
             }
         }
