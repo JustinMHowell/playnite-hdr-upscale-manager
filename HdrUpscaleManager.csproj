@@ -28,6 +28,10 @@
     <PackageReference Include="PlayniteSDK" Version="6.16.0" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
     <PackageReference Include="HtmlAgilityPack" Version="1.11.72" />
+    <!-- Needed only for real 7z extraction (DXVK+Lilium, OptiScaler releases) — ReShade's
+         disguised-zip payload didn't need this, but genuine LZMA/7z decoding isn't something
+         to hand-roll. -->
+    <PackageReference Include="SharpCompress" Version="1.0.0" />
   </ItemGroup>
 
   <ItemGroup>
@@ -39,6 +43,16 @@
   <ItemGroup>
     <!-- Ship this next to the DLL so Playnite's Extensions folder is self-contained -->
     <None Include="extension.yaml" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Bundled verbatim from optiscaler/OptiScaler's OptiScaler.amd-dlss.ini (GPL-3.0, credited
+         in THIRD_PARTY_NOTICES.md) — the AMD no-DLSS variant is derived from this at runtime by
+         flipping the single [Spoofing] Dxgi= line, since the two upstream files are otherwise
+         byte-identical. -->
+    <EmbeddedResource Include="Resources\OptiScaler.ini.template">
+      <LogicalName>HdrUpscaleManager.Resources.OptiScaler.ini.template</LogicalName>
+    </EmbeddedResource>
   </ItemGroup>
 
   <ItemGroup>
