@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Net.Http;
+using System.Security.Cryptography;
 using System.Threading.Tasks;
 
 namespace HdrUpscaleManager.Services.Addons
@@ -10,6 +11,15 @@ namespace HdrUpscaleManager.Services.Addons
         public bool Success { get; set; }
         public string Error { get; set; }
         public string InstalledPath { get; set; }
+        public string FileHash { get; set; }
+        public long? RemoteContentLength { get; set; }
+        public DateTimeOffset? RemoteLastModified { get; set; }
+    }
+
+    public class AddonProbeResult
+    {
+        public long? ContentLength { get; set; }
+        public DateTimeOffset? LastModified { get; set; }
     }
 
     /* Shared addon-file installer — downloads a .addon64/.addon32 and drops it into the game
@@ -23,9 +33,17 @@ namespace HdrUpscaleManager.Services.Addons
         public async Task<AddonInstallResult> InstallAsync(string gameInstallPath, string downloadUrl, string addonFileName)
         {
             byte[] bytes;
+            long? contentLength;
+            DateTimeOffset? lastModified;
             try
             {
-                bytes = await Http.GetByteArrayAsync(downloadUrl).ConfigureAwait(false);
+                using (var response = await Http.GetAsync(downloadUrl).ConfigureAwait(false))
+                {
+                    response.EnsureSuccessStatusCode();
+                    bytes = await response.Content.ReadAsByteArrayAsync().ConfigureAwait(false);
+                    contentLength = response.Content.Headers.ContentLength;
+                    lastModified = response.Content.Headers.LastModified;
+                }
             }
             catch (Exception ex)
             {
@@ -45,7 +63,44 @@ namespace HdrUpscaleManager.Services.Addons
             }
 
             Log.Info($"Installed addon '{addonFileName}' to '{targetPath}'.");
-            return new AddonInstallResult { Success = true, InstalledPath = targetPath };
+            return new AddonInstallResult
+            {
+                Success = true,
+                InstalledPath = targetPath,
+                FileHash = ComputeSha256(bytes),
+                RemoteContentLength = contentLength,
+                RemoteLastModified = lastModified
+            };
+        }
+
+        /* HEAD request against a mod's current download URL — used to check for an update
+           without re-downloading the file first. */
+        public static async Task<AddonProbeResult> ProbeAsync(string url)
+        {
+            try
+            {
+                using (var request = new HttpRequestMessage(HttpMethod.Head, url))
+                using (var response = await Http.SendAsync(request).ConfigureAwait(false))
+                {
+                    response.EnsureSuccessStatusCode();
+                    return new AddonProbeResult
+                    {
+                        ContentLength = response.Content.Headers.ContentLength,
+                        LastModified = response.Content.Headers.LastModified
+                    };
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Warn(ex, $"Failed to probe addon URL '{url}'.");
+                return new AddonProbeResult();
+            }
+        }
+
+        private static string ComputeSha256(byte[] bytes)
+        {
+            using (var sha256 = SHA256.Create())
+                return BitConverter.ToString(sha256.ComputeHash(bytes)).Replace("-", "").ToLowerInvariant();
         }
 
         private static AddonInstallResult Fail(string error) => new AddonInstallResult { Success = false, Error = error };
