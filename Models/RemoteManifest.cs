@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Newtonsoft.Json;
 
 namespace HdrUpscaleManager.Models
@@ -50,6 +51,50 @@ namespace HdrUpscaleManager.Models
         [JsonProperty("addonPacks")]
         public Dictionary<string, ManifestAddonPack> AddonPacks { get; set; }
 
+        /* Component-level download URL overrides, keyed by a fixed component id (e.g.
+           "ueExtended") rather than a game name. */
+        [JsonProperty("componentUrls")]
+        public Dictionary<string, string> ComponentUrls { get; set; }
+
+        [JsonProperty("dxvkBlacklist")]
+        public List<string> DxvkBlacklist { get; set; }
+
+        /* Per-game forced graphics-API override (e.g. "D3D9"), used when PeInspector's
+           auto-detection can't determine it. */
+        [JsonProperty("dxvkApiOverrides")]
+        public Dictionary<string, string> DxvkApiOverrides { get; set; }
+
+        /* Per-game forced DLL-proxy name (e.g. "Mirror's Edge": "winmm.dll") — takes priority
+           over the Vulkan auto-override. */
+        [JsonProperty("optiScalerDllOverrides")]
+        public Dictionary<string, string> OptiScalerDllOverrides { get; set; }
+
+        /* Remaps a detected game name to the OptiScaler compatibility wiki's own naming when
+           they differ. */
+        [JsonProperty("optiScalerWikiNames")]
+        public Dictionary<string, string> OptiScalerWikiNames { get; set; }
+
+        public bool IsBlacklisted(string gameName)
+        {
+            return !string.IsNullOrEmpty(gameName) && Blacklist != null &&
+                Blacklist.Contains(gameName, StringComparer.OrdinalIgnoreCase);
+        }
+
+        /* Luma and RenoDX are mutually exclusive per game by default — installing Luma normally
+           means uninstalling RenoDX first — except for the manifest's curated allowlist of games
+           known to run both safely at once. */
+        public bool IsLumaRenodxCompatible(string gameName)
+        {
+            return !string.IsNullOrEmpty(gameName) && LumaRenodxCompat != null &&
+                LumaRenodxCompat.Contains(gameName, StringComparer.OrdinalIgnoreCase);
+        }
+
+        public bool IsDxvkBlacklisted(string gameName)
+        {
+            return !string.IsNullOrEmpty(gameName) && DxvkBlacklist != null &&
+                DxvkBlacklist.Contains(gameName, StringComparer.OrdinalIgnoreCase);
+        }
+
         /* Rebuilds every game-name-keyed dictionary with a case-insensitive comparer —
            Playnite's Game.Name won't always match the manifest's casing exactly. */
         public static void Normalize(RemoteManifest manifest)
@@ -62,6 +107,9 @@ namespace HdrUpscaleManager.Models
             manifest.EngineHintOverrides = CaseInsensitive(manifest.EngineHintOverrides);
             manifest.GameNotes = CaseInsensitive(manifest.GameNotes);
             manifest.LumaGameNotes = CaseInsensitive(manifest.LumaGameNotes);
+            manifest.DxvkApiOverrides = CaseInsensitive(manifest.DxvkApiOverrides);
+            manifest.OptiScalerDllOverrides = CaseInsensitive(manifest.OptiScalerDllOverrides);
+            manifest.OptiScalerWikiNames = CaseInsensitive(manifest.OptiScalerWikiNames);
         }
 
         private static Dictionary<string, T> CaseInsensitive<T>(Dictionary<string, T> source)

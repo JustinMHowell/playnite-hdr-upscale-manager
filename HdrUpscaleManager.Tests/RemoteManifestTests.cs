@@ -71,5 +71,41 @@ namespace HdrUpscaleManager.Tests
             Assert.Equal("Cyberpunk2077", value);
             Assert.True(manifest.WikiNameOverrides.ContainsKey("CYBERPUNK 2077"));
         }
+
+        [Fact]
+        public void IsBlacklisted_CaseInsensitiveMatch_ReturnsTrue()
+        {
+            var manifest = new RemoteManifest { Blacklist = new List<string> { "Rainbow Six Siege" } };
+
+            Assert.True(manifest.IsBlacklisted("rainbow six siege"));
+            Assert.False(manifest.IsBlacklisted("Elden Ring"));
+        }
+
+        [Fact]
+        public void IsBlacklisted_NullBlacklistOrGameName_ReturnsFalse()
+        {
+            var manifest = new RemoteManifest();
+
+            Assert.False(manifest.IsBlacklisted("Elden Ring"));
+            Assert.False(new RemoteManifest { Blacklist = new List<string> { "Elden Ring" } }.IsBlacklisted(null));
+        }
+
+        [Fact]
+        public void IsLumaRenodxCompatible_CaseInsensitiveMatch_ReturnsTrue()
+        {
+            var manifest = new RemoteManifest { LumaRenodxCompat = new List<string> { "Some Dual-Mode Game" } };
+
+            Assert.True(manifest.IsLumaRenodxCompatible("some dual-mode game"));
+            Assert.False(manifest.IsLumaRenodxCompatible("Other Game"));
+        }
+
+        [Fact]
+        public void IsDxvkBlacklisted_CaseInsensitiveMatch_ReturnsTrue()
+        {
+            var manifest = new RemoteManifest { DxvkBlacklist = new List<string> { "Anti-Cheat Game" } };
+
+            Assert.True(manifest.IsDxvkBlacklisted("anti-cheat game"));
+            Assert.False(manifest.IsDxvkBlacklisted("Safe Game"));
+        }
     }
 }

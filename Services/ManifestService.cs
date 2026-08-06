@@ -45,6 +45,11 @@ namespace HdrUpscaleManager.Services
             return client;
         }
 
+        /* Synchronous, disk-only read of the last successfully cached manifest — no network
+           call, safe to use from menu-building code that can't await. Returns null if nothing
+           has been cached yet. */
+        public RemoteManifest TryGetCachedManifest() => LoadCached()?.Manifest;
+
         public async Task<ManifestFetchResult> FetchAsync()
         {
             var viaApi = await TryFetchViaGitHubApiAsync().ConfigureAwait(false);
