@@ -1,0 +1,118 @@
+<UserControl x:Class="HdrUpscaleManager.UI.ManagerView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:HdrUpscaleManager.UI">
+    <UserControl.Resources>
+        <local:StringNotEmptyToVisibilityConverter x:Key="StringNotEmptyToVis"/>
+
+        <Style x:Key="SectionBorder" TargetType="Border">
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="BorderBrush" Value="#33808080"/>
+            <Setter Property="CornerRadius" Value="6"/>
+            <Setter Property="Padding" Value="14,10"/>
+            <Setter Property="Margin" Value="0,0,0,10"/>
+        </Style>
+        <Style x:Key="SectionTitle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="16"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="White"/>
+        </Style>
+        <Style x:Key="SectionStatus" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Foreground" Value="#BFBFBF"/>
+            <Setter Property="Margin" Value="0,2,0,8"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+        </Style>
+        <Style TargetType="Button">
+            <Setter Property="Margin" Value="0,0,8,0"/>
+            <Setter Property="Padding" Value="10,4"/>
+        </Style>
+    </UserControl.Resources>
+
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock Grid.Row="0" Text="{Binding GameName}" FontSize="22" FontWeight="Bold" Foreground="White" Margin="0,0,0,4"/>
+        <TextBlock Grid.Row="1" Text="{Binding StatusText}" Foreground="#66B2FF" FontSize="13" Margin="0,0,0,16" TextWrapping="Wrap"/>
+
+        <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
+            <StackPanel>
+                <Border Style="{StaticResource SectionBorder}">
+                    <StackPanel>
+                        <TextBlock Text="ReShade" Style="{StaticResource SectionTitle}"/>
+                        <TextBlock Text="{Binding ReShadeStatus}" Style="{StaticResource SectionStatus}"/>
+                        <StackPanel Orientation="Horizontal">
+                            <Button Content="Install latest" Command="{Binding ReShadeInstallCommand}"/>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
+                <Border Style="{StaticResource SectionBorder}">
+                    <StackPanel>
+                        <TextBlock Text="RenoDX" Style="{StaticResource SectionTitle}"/>
+                        <TextBlock Text="{Binding RenoDxStatus}" Style="{StaticResource SectionStatus}"/>
+                        <StackPanel Orientation="Horizontal">
+                            <Button Content="Install" Command="{Binding RenoDxInstallCommand}"/>
+                            <Button Content="Check update" Command="{Binding RenoDxUpdateCommand}"/>
+                            <Button Content="Uninstall" Command="{Binding RenoDxUninstallCommand}"/>
+                            <Button Content="Open link" Command="{Binding OpenRenoDxExternalUrlCommand}"
+                                    Visibility="{Binding RenoDxExternalUrl, Converter={StaticResource StringNotEmptyToVis}}"/>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
+                <Border Style="{StaticResource SectionBorder}">
+                    <StackPanel>
+                        <TextBlock Text="Luma" Style="{StaticResource SectionTitle}"/>
+                        <TextBlock Text="{Binding LumaStatus}" Style="{StaticResource SectionStatus}"/>
+                        <StackPanel Orientation="Horizontal">
+                            <Button Content="Install" Command="{Binding LumaInstallCommand}"/>
+                            <Button Content="Check update" Command="{Binding LumaUpdateCommand}"/>
+                            <Button Content="Uninstall" Command="{Binding LumaUninstallCommand}"/>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
+                <Border Style="{StaticResource SectionBorder}">
+                    <StackPanel>
+                        <TextBlock Text="DXVK+Lilium HDR" Style="{StaticResource SectionTitle}"/>
+                        <TextBlock Text="{Binding DxvkStatus}" Style="{StaticResource SectionStatus}"/>
+                        <StackPanel Orientation="Horizontal">
+                            <Button Content="Install (DX9/DX10)" Command="{Binding DxvkInstallCommand}"/>
+                            <Button Content="Check update" Command="{Binding DxvkUpdateCommand}"/>
+                            <Button Content="Uninstall" Command="{Binding DxvkUninstallCommand}"/>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
+                <Border Style="{StaticResource SectionBorder}">
+                    <StackPanel>
+                        <TextBlock Text="OptiScaler (AMD)" Style="{StaticResource SectionTitle}"/>
+                        <TextBlock Text="{Binding OptiScalerStatus}" Style="{StaticResource SectionStatus}"/>
+                        <StackPanel Orientation="Horizontal">
+                            <Button Content="Install (DLSS-only game)" Command="{Binding OptiScalerInstallDlssCommand}"/>
+                            <Button Content="Install (has FSR/XeSS)" Command="{Binding OptiScalerInstallNoDlssCommand}"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                            <Button Content="Check update" Command="{Binding OptiScalerUpdateCommand}"/>
+                            <Button Content="Uninstall" Command="{Binding OptiScalerUninstallCommand}"/>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
+                <Border Style="{StaticResource SectionBorder}">
+                    <StackPanel>
+                        <TextBlock Text="OS HDR toggle on launch/exit" Style="{StaticResource SectionTitle}"/>
+                        <TextBlock Text="Unverified — validate on your own display before relying on it (see PLAN.md)."
+                                   Style="{StaticResource SectionStatus}"/>
+                        <CheckBox Content="Enable for this game" IsChecked="{Binding HdrToggleEnabled}" Foreground="White"/>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</UserControl>

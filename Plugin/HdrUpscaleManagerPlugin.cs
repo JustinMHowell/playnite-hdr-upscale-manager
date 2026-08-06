@@ -1,19 +1,18 @@
 using HdrUpscaleManager.Services;
-using HdrUpscaleManager.Services.Addons;
-using HdrUpscaleManager.Services.ReShade;
 using Playnite.SDK;
 using Playnite.SDK.Plugins;
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Reflection;
-using System.Threading.Tasks;
 using System.Windows.Controls;
 
 namespace HdrUpscaleManager.Plugin
 {
-    public class HdrUpscaleManagerPlugin : GenericPlugin
+    /* Split across HdrUpscaleManagerPlugin.*.cs partials, one per addon (ReShade/RenoDx/Luma/
+       Dxvk/OptiScaler/Hdr), since a single file covering all of them would be unwieldy — mirrors
+       RHI's own per-concern partial-class convention (MainViewModel.Install.cs, .BuildCards.cs, etc). */
+    public partial class HdrUpscaleManagerPlugin : GenericPlugin
     {
         private static readonly ILogger logger = LogManager.GetLogger();
 
@@ -67,113 +66,37 @@ namespace HdrUpscaleManager.Plugin
                 ?? new List<Playnite.SDK.Models.Game>();
             if (games.Count == 0) yield break;
 
-            yield return new GameMenuItem
+            var game = games[0];
+            var cachedManifest = new ManifestService(GetPluginUserDataPath()).TryGetCachedManifest();
+            if (cachedManifest?.IsBlacklisted(game.Name) == true)
             {
-                Description = "Install ReShade (latest)",
-                MenuSection = "HDR & Upscale Manager",
-                Action = async _ => await InstallReShadeAsync(games[0])
-            };
-
-            yield return new GameMenuItem
-            {
-                Description = "Install RenoDX (matched game)",
-                MenuSection = "HDR & Upscale Manager",
-                Action = async _ => await InstallRenoDxMatchedAsync(games[0])
-            };
-
-            yield return new GameMenuItem
-            {
-                Description = "Install RenoDX (Unreal Engine, generic)",
-                MenuSection = "HDR & Upscale Manager",
-                Action = async _ => await InstallRenoDxAsync(games[0], RenoDxEngine.UnrealEngine)
-            };
-
-            yield return new GameMenuItem
-            {
-                Description = "Install RenoDX (Unity, generic)",
-                MenuSection = "HDR & Upscale Manager",
-                Action = async _ => await InstallRenoDxAsync(games[0], RenoDxEngine.UnityEngine)
-            };
-        }
-
-        private async Task InstallRenoDxAsync(Playnite.SDK.Models.Game game, RenoDxEngine engine)
-        {
-            try
-            {
-                var result = await RenoDxService.InstallGenericAsync(game.InstallDirectory, engine);
-                if (!result.Success)
+                yield return new GameMenuItem
                 {
-                    PlayniteApi.Dialogs.ShowErrorMessage(result.Error, "Install RenoDX");
-                    return;
-                }
+                    Description = "Blacklisted by manifest — install unavailable",
+                    MenuSection = "HDR & Upscale Manager",
+                    Action = _ => PlayniteApi.Dialogs.ShowMessage(
+                        $"'{game.Name}' is on the manifest's blacklist (usually anti-cheat games where modding risks a ban) — install actions are disabled for it.",
+                        "HDR & Upscale Manager")
+                };
+                yield break;
+            }
 
-                PlayniteApi.Dialogs.ShowMessage($"Installed RenoDX to:\n{result.InstalledPath}", "Install RenoDX");
-            }
-            catch (Exception ex)
+            foreach (var item in BuildReShadeMenuItems(game)) yield return item;
+            foreach (var item in BuildRenoDxMenuItems(game)) yield return item;
+            foreach (var item in BuildLumaMenuItems(game)) yield return item;
+            foreach (var item in BuildDxvkMenuItems(game)) yield return item;
+            foreach (var item in BuildOptiScalerMenuItems(game)) yield return item;
+            foreach (var item in BuildHdrToggleMenuItems(game)) yield return item;
+
+            yield return new GameMenuItem
             {
-                Log.Error(ex, $"RenoDX install failed for '{game.Name}'.");
-                PlayniteApi.Dialogs.ShowErrorMessage($"RenoDX install failed: {ex.Message}", "Install RenoDX");
-            }
+                Description = "Open in HDR & Upscale Manager…",
+                MenuSection = "HDR & Upscale Manager",
+                Action = _ => OpenManagerWindow(game)
+            };
         }
 
-        private async Task InstallRenoDxMatchedAsync(Playnite.SDK.Models.Game game)
-        {
-            try
-            {
-                var manifestService = new ManifestService(GetPluginUserDataPath());
-                var manifestResult = await manifestService.FetchAsync().ConfigureAwait(false);
-                var nameOverrides = manifestResult?.Manifest?.WikiNameOverrides;
-
-                var wikiCacheDir = Path.Combine(GetPluginUserDataPath(), "RenoDxWikiCache");
-                var result = await RenoDxService
-                    .InstallForGameAsync(game.InstallDirectory, game.Name, wikiCacheDir, nameOverrides)
-                    .ConfigureAwait(false);
-
-                if (!result.Success)
-                {
-                    PlayniteApi.Dialogs.ShowErrorMessage(result.Error, "Install RenoDX");
-                    return;
-                }
-
-                var message = $"Installed RenoDX ({result.MatchedGameName}) to:\n{result.InstalledPath}";
-                if (!string.IsNullOrEmpty(result.Notes))
-                    message += $"\n\nNote: {result.Notes}";
-
-                PlayniteApi.Dialogs.ShowMessage(message, "Install RenoDX");
-            }
-            catch (Exception ex)
-            {
-                Log.Error(ex, $"RenoDX matched install failed for '{game.Name}'.");
-                PlayniteApi.Dialogs.ShowErrorMessage($"RenoDX install failed: {ex.Message}", "Install RenoDX");
-            }
-        }
-
-        private async Task InstallReShadeAsync(Playnite.SDK.Models.Game game)
-        {
-            try
-            {
-                var cacheDir = Path.Combine(GetPluginUserDataPath(), "ReShadeCache");
-                var service = new ReShadeInstallService(cacheDir);
-                var result = await service.InstallAsync(game.InstallDirectory);
-
-                if (!result.Success)
-                {
-                    PlayniteApi.Dialogs.ShowErrorMessage(result.Error, "Install ReShade");
-                    return;
-                }
-
-                PlayniteApi.Dialogs.ShowMessage(
-                    $"Installed ReShade {result.Version} ({result.Api}) to:\n{result.InstalledDllPath}",
-                    "Install ReShade");
-            }
-            catch (Exception ex)
-            {
-                Log.Error(ex, $"ReShade install failed for '{game.Name}'.");
-                PlayniteApi.Dialogs.ShowErrorMessage($"ReShade install failed: {ex.Message}", "Install ReShade");
-            }
-        }
-
-        private async Task CheckManifestSyncAsync()
+        private async System.Threading.Tasks.Task CheckManifestSyncAsync()
         {
             try
             {
