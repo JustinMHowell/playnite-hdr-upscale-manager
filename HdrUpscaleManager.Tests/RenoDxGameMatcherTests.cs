@@ -73,6 +73,58 @@ namespace HdrUpscaleManager.Tests
         }
 
         [Fact]
+        public void Match_RejectsUnrelatedTitleSuffixWhenGameNameIsShorterPrefix()
+        {
+            var mods = new List<RenoDxWikiMod>
+            {
+                new RenoDxWikiMod { Name = "Hollow Knight: Silksong", SnapshotUrl = "https://example.com/silksong.addon64" }
+            };
+
+            var match = RenoDxGameMatcher.Match("Hollow Knight", mods);
+
+            Assert.Null(match);
+        }
+
+        [Fact]
+        public void Match_AcceptsKnownEditionSuffixWhenGameNameIsShorterPrefix()
+        {
+            var mods = new List<RenoDxWikiMod>
+            {
+                new RenoDxWikiMod { Name = "Ori and the Blind Forest: Definitive Edition", SnapshotUrl = "https://example.com/ori.addon64" }
+            };
+
+            var match = RenoDxGameMatcher.Match("Ori and the Blind Forest", mods);
+
+            Assert.NotNull(match);
+        }
+
+        [Fact]
+        public void Match_RejectsShortCandidateNameFoundAsRawSubstring()
+        {
+            var mods = new List<RenoDxWikiMod>
+            {
+                new RenoDxWikiMod { Name = "Fe", SnapshotUrl = "https://example.com/fe.addon64" }
+            };
+
+            var match = RenoDxGameMatcher.Match("Mass Effect 2", mods);
+
+            Assert.Null(match);
+        }
+
+        [Fact]
+        public void Match_RejectsCandidateNameFoundAsRawSubstringInsideALongerWord()
+        {
+            var mods = new List<RenoDxWikiMod>
+            {
+                new RenoDxWikiMod { Name = "Stray", SnapshotUrl = "https://example.com/stray.addon64" }
+            };
+
+            var match = RenoDxGameMatcher.Match("MO:Astray", mods);
+
+            Assert.Null(match);
+        }
+
+        [Fact]
         public void Match_NoCandidateFound_ReturnsNull()
         {
             var mods = new List<RenoDxWikiMod>

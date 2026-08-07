@@ -62,6 +62,9 @@ namespace HdrUpscaleManager.Plugin
             };
         }
 
+        /* One entry, straight into the per-game window — every install/toggle/uninstall action
+           for every component (ReShade/RenoDX/Luma/DXVK/OptiScaler/HDR toggle) lives there
+           (ManagerViewModel), so there's nothing left for a right-click submenu to duplicate. */
         public override IEnumerable<GameMenuItem> GetGameMenuItems(GetGameMenuItemsArgs args)
         {
             var games = args.Games?.Where(g => !string.IsNullOrEmpty(g.InstallDirectory)).ToList()
@@ -82,13 +85,6 @@ namespace HdrUpscaleManager.Plugin
                 };
                 yield break;
             }
-
-            foreach (var item in BuildReShadeMenuItems(game)) yield return item;
-            foreach (var item in BuildRenoDxMenuItems(game, cachedManifest)) yield return item;
-            foreach (var item in BuildLumaMenuItems(game)) yield return item;
-            foreach (var item in BuildDxvkMenuItems(game)) yield return item;
-            foreach (var item in BuildOptiScalerMenuItems(game)) yield return item;
-            foreach (var item in BuildHdrToggleMenuItems(game)) yield return item;
 
             yield return new GameMenuItem
             {
