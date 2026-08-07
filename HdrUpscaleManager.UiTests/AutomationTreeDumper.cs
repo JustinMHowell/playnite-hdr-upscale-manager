@@ -21,18 +21,12 @@ namespace HdrUpscaleManager.UiTests
         {
             if (element == null || depth > maxDepth) return;
 
-            string name, controlType, automationId;
-            try
-            {
-                name = element.Name;
-                controlType = element.ControlType.ToString();
-                automationId = element.AutomationId;
-            }
-            catch (Exception ex)
-            {
-                sb.AppendLine(new string(' ', depth * 2) + "<error reading element: " + ex.Message + ">");
-                return;
-            }
+            // Each property read independently — some control types don't support a given
+            // property (e.g. AutomationId throwing "not supported" for certain elements) and
+            // that shouldn't blank out the whole node or abort recursing into its children.
+            var name = SafeRead(() => element.Name, "<name unsupported>");
+            var controlType = SafeRead(() => element.ControlType.ToString(), "<controltype unsupported>");
+            var automationId = SafeRead(() => element.AutomationId, "<automationid unsupported>");
 
             sb.AppendLine($"{new string(' ', depth * 2)}[{controlType}] Name=\"{name}\" AutomationId=\"{automationId}\"");
 
@@ -56,6 +50,12 @@ namespace HdrUpscaleManager.UiTests
                 }
                 Walk(child, depth + 1, maxDepth, maxChildrenPerNode, sb);
             }
+        }
+
+        private static string SafeRead(Func<string> read, string fallback)
+        {
+            try { return read(); }
+            catch { return fallback; }
         }
     }
 }
