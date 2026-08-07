@@ -13,7 +13,10 @@
          process supplies its own at runtime — shipping ours risks a load conflict)
        - extension.yaml
        - Resources\ (icon.png, etc.)
-  5. Relaunches Playnite.
+  5. Relaunches Playnite via the "Desktop/Playnite" Steam shortcut so the new
+     build is loaded through Steam (matches how it's normally launched on this
+     machine — Steam overlay, controller input passthrough, etc), mirroring
+     playnite-eden-mod-manager's build-and-run.ps1.
 
 .PARAMETER NoRestart
   Skip closing/relaunching Playnite — just build and deploy.
@@ -29,6 +32,13 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $root = $PSScriptRoot
+
+# steam://rungameid URL behind the "Playnite" shortcut on this machine's Desktop
+# (C:\Users\Matheus\Desktop\Playnite.url) — relaunching through Steam instead of the
+# bare exe so it comes up the same way it normally does (overlay, input, etc). Playnite
+# itself is a non-Steam-game shortcut here (D:\Playnite\Playnite\), not under
+# %LOCALAPPDATA%\Playnite or on PATH, which is why a plain exe lookup doesn't find it.
+$playniteSteamUrl = 'steam://rungameid/15319020825756041216'
 
 # --- Close Playnite (its extension DLLs are locked while running) ---------
 $playniteProc = Get-Process Playnite* -ErrorAction SilentlyContinue
@@ -66,22 +76,8 @@ if (Test-Path "$root\Resources") {
 
 Write-Host "Deployed to $dest" -ForegroundColor Green
 
-# --- Relaunch Playnite ------------------------------------------------------
-# Adjust this if you normally launch Playnite through Steam or another
-# frontend instead of its own executable.
+# --- Relaunch Playnite (via Steam, matching the Desktop/Playnite shortcut) --
 if (-not $NoRestart) {
-    $playniteExe = Get-Command 'Playnite.DesktopApp.exe' -ErrorAction SilentlyContinue |
-        Select-Object -ExpandProperty Source -First 1
-    if (-not $playniteExe) {
-        $candidate = Join-Path $env:LOCALAPPDATA 'Playnite\Playnite.DesktopApp.exe'
-        if (Test-Path $candidate) { $playniteExe = $candidate }
-    }
-
-    if ($playniteExe) {
-        Write-Host "Launching Playnite ($playniteExe)..." -ForegroundColor DarkGray
-        Start-Process $playniteExe
-    }
-    else {
-        Write-Host "Could not locate Playnite.DesktopApp.exe — start Playnite manually." -ForegroundColor Yellow
-    }
+    Write-Host "Launching Playnite via Steam ($playniteSteamUrl)..." -ForegroundColor DarkGray
+    Start-Process $playniteSteamUrl
 }
