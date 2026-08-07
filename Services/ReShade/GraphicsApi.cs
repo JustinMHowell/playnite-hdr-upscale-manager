@@ -3,6 +3,7 @@ namespace HdrUpscaleManager.Services.ReShade
     public enum GraphicsApi
     {
         Unknown,
+        D3D8,
         D3D9,
         D3D10,
         D3D11,

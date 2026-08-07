@@ -62,6 +62,12 @@
                             <Button Content="Open link" Command="{Binding OpenRenoDxExternalUrlCommand}"
                                     Visibility="{Binding RenoDxExternalUrl, Converter={StaticResource StringNotEmptyToVis}}"/>
                         </StackPanel>
+                        <TextBlock Text="{Binding RenoDxEngineDetectionText}" Style="{StaticResource SectionStatus}" Margin="0,8,0,4"/>
+                        <StackPanel Orientation="Horizontal">
+                            <Button Content="Unreal Engine, generic" Command="{Binding RenoDxInstallUnrealGenericCommand}" IsEnabled="{Binding CanInstallUnrealRenoDx}"/>
+                            <Button Content="Unreal Engine, UE-Extended" Command="{Binding RenoDxInstallUnrealUeExtendedCommand}" IsEnabled="{Binding CanInstallUnrealRenoDx}"/>
+                            <Button Content="Unity, generic" Command="{Binding RenoDxInstallUnityCommand}" IsEnabled="{Binding CanInstallUnityRenoDx}"/>
+                        </StackPanel>
                     </StackPanel>
                 </Border>
 
@@ -81,8 +87,9 @@
                     <StackPanel>
                         <TextBlock Text="DXVK+Lilium HDR" Style="{StaticResource SectionTitle}"/>
                         <TextBlock Text="{Binding DxvkStatus}" Style="{StaticResource SectionStatus}"/>
+                        <TextBlock Text="{Binding DxvkApiDetectionText}" Style="{StaticResource SectionStatus}"/>
                         <StackPanel Orientation="Horizontal">
-                            <Button Content="Install (DX9/DX10)" Command="{Binding DxvkInstallCommand}"/>
+                            <Button Content="Install (DX8/DX9/DX10)" Command="{Binding DxvkInstallCommand}" IsEnabled="{Binding CanInstallDxvk}"/>
                             <Button Content="Check update" Command="{Binding DxvkUpdateCommand}"/>
                             <Button Content="Uninstall" Command="{Binding DxvkUninstallCommand}"/>
                         </StackPanel>

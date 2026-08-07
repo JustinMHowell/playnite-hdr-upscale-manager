@@ -117,12 +117,18 @@
 
                     <TextBlock Text="RenoDX" Style="{StaticResource FsSectionTitle}"/>
                     <TextBlock Text="{Binding RenoDxStatus}" Style="{StaticResource FsSectionStatus}"/>
-                    <StackPanel Orientation="Horizontal" Margin="0,0,0,20">
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
                         <Button Content="Install" Style="{StaticResource FsButton}" Command="{Binding RenoDxInstallCommand}"/>
                         <Button Content="Check update" Style="{StaticResource FsButton}" Command="{Binding RenoDxUpdateCommand}"/>
                         <Button Content="Uninstall" Style="{StaticResource FsButton}" Command="{Binding RenoDxUninstallCommand}"/>
                         <Button Content="Open link" Style="{StaticResource FsButton}" Command="{Binding OpenRenoDxExternalUrlCommand}"
                                 Visibility="{Binding RenoDxExternalUrl, Converter={StaticResource StringNotEmptyToVis}}"/>
+                    </StackPanel>
+                    <TextBlock Text="{Binding RenoDxEngineDetectionText}" Style="{StaticResource FsSectionStatus}" Margin="0,0,0,4"/>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,20">
+                        <Button Content="Unreal Engine, generic" Style="{StaticResource FsButton}" Command="{Binding RenoDxInstallUnrealGenericCommand}" IsEnabled="{Binding CanInstallUnrealRenoDx}"/>
+                        <Button Content="Unreal Engine, UE-Extended" Style="{StaticResource FsButton}" Command="{Binding RenoDxInstallUnrealUeExtendedCommand}" IsEnabled="{Binding CanInstallUnrealRenoDx}"/>
+                        <Button Content="Unity, generic" Style="{StaticResource FsButton}" Command="{Binding RenoDxInstallUnityCommand}" IsEnabled="{Binding CanInstallUnityRenoDx}"/>
                     </StackPanel>
 
                     <TextBlock Text="Luma" Style="{StaticResource FsSectionTitle}"/>
@@ -135,8 +141,9 @@
 
                     <TextBlock Text="DXVK+Lilium HDR" Style="{StaticResource FsSectionTitle}"/>
                     <TextBlock Text="{Binding DxvkStatus}" Style="{StaticResource FsSectionStatus}"/>
+                    <TextBlock Text="{Binding DxvkApiDetectionText}" Style="{StaticResource FsSectionStatus}"/>
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,20">
-                        <Button Content="Install (DX9/DX10)" Style="{StaticResource FsButton}" Command="{Binding DxvkInstallCommand}"/>
+                        <Button Content="Install (DX8/DX9/DX10)" Style="{StaticResource FsButton}" Command="{Binding DxvkInstallCommand}" IsEnabled="{Binding CanInstallDxvk}"/>
                         <Button Content="Check update" Style="{StaticResource FsButton}" Command="{Binding DxvkUpdateCommand}"/>
                         <Button Content="Uninstall" Style="{StaticResource FsButton}" Command="{Binding DxvkUninstallCommand}"/>
                     </StackPanel>

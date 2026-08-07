@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Threading.Tasks;
@@ -20,11 +21,38 @@ namespace HdrUpscaleManager.UI
        additional ShowErrorMessage popup for unexpected exceptions, so a failure is never silent. */
     public class ManagerViewModel : ObservableObject
     {
+        private static readonly HashSet<GraphicsApi> DxvkSupportedApis =
+            new HashSet<GraphicsApi> { GraphicsApi.D3D8, GraphicsApi.D3D9, GraphicsApi.D3D10 };
+
         private readonly IPlayniteAPI api;
         private readonly string userDataPath;
 
+        /* Detected once at window-open time (install folder doesn't change while the window is
+           open) — drives the RenoDX per-engine and DXVK IsEnabled bindings below. */
+        private readonly RenoDxEngine? detectedRenoDxEngine;
+        private readonly GraphicsApi detectedDxvkApi;
+
         public Game Game { get; }
         public string GameName => Game.Name;
+
+        public bool CanInstallUnrealRenoDx => detectedRenoDxEngine == null || detectedRenoDxEngine == RenoDxEngine.UnrealEngine;
+        public bool CanInstallUnityRenoDx => detectedRenoDxEngine == null || detectedRenoDxEngine == RenoDxEngine.UnityEngine;
+        public string RenoDxEngineDetectionText => detectedRenoDxEngine switch
+        {
+            RenoDxEngine.UnrealEngine => "Detected engine: Unreal Engine.",
+            RenoDxEngine.UnityEngine => "Detected engine: Unity.",
+            _ => "Engine not auto-detected — Unreal and Unity options both available."
+        };
+
+        public bool CanInstallDxvk => DxvkSupportedApis.Contains(detectedDxvkApi);
+        public string DxvkApiDetectionText => detectedDxvkApi switch
+        {
+            GraphicsApi.D3D8 => "Detected graphics API: DirectX 8.",
+            GraphicsApi.D3D9 => "Detected graphics API: DirectX 9.",
+            GraphicsApi.D3D10 => "Detected graphics API: DirectX 10.",
+            GraphicsApi.Unknown => "Graphics API not detected (game not installed, or its executable couldn't be read) — install disabled.",
+            _ => $"Detected graphics API: {detectedDxvkApi} — DXVK+Lilium HDR isn't offered for this API."
+        };
 
         private string statusText = "Ready.";
         public string StatusText { get => statusText; private set => SetProperty(ref statusText, value); }
@@ -77,6 +105,9 @@ namespace HdrUpscaleManager.UI
         public ICommand ReShadeInstallCommand { get; }
 
         public ICommand RenoDxInstallCommand { get; }
+        public ICommand RenoDxInstallUnrealGenericCommand { get; }
+        public ICommand RenoDxInstallUnrealUeExtendedCommand { get; }
+        public ICommand RenoDxInstallUnityCommand { get; }
         public ICommand RenoDxUpdateCommand { get; }
         public ICommand RenoDxUninstallCommand { get; }
         public ICommand OpenRenoDxExternalUrlCommand { get; }
@@ -100,9 +131,25 @@ namespace HdrUpscaleManager.UI
             this.userDataPath = userDataPath;
             Game = game;
 
+            var cachedManifest = new ManifestService(userDataPath).TryGetCachedManifest();
+            detectedRenoDxEngine = RenoDxEngineDetector.Detect(
+                Game.InstallDirectory, GameName, cachedManifest?.InstallPathOverrides, cachedManifest?.EngineHintOverrides).Engine;
+
+            var exePath = PeInspector.FindGameExecutable(Game.InstallDirectory);
+            detectedDxvkApi = exePath != null ? (PeInspector.Inspect(exePath)?.Api ?? GraphicsApi.Unknown) : GraphicsApi.Unknown;
+
             ReShadeInstallCommand = new RelayCommand(() => Run(InstallReShadeAsync), () => !IsBusy);
 
             RenoDxInstallCommand = new RelayCommand(() => Run(InstallRenoDxAsync), () => !IsBusy);
+            RenoDxInstallUnrealGenericCommand = new RelayCommand(
+                () => Run(() => InstallRenoDxEngineAsync(RenoDxEngine.UnrealEngine, forceUeExtended: null)),
+                () => !IsBusy && CanInstallUnrealRenoDx);
+            RenoDxInstallUnrealUeExtendedCommand = new RelayCommand(
+                () => Run(() => InstallRenoDxEngineAsync(RenoDxEngine.UnrealEngine, forceUeExtended: true)),
+                () => !IsBusy && CanInstallUnrealRenoDx);
+            RenoDxInstallUnityCommand = new RelayCommand(
+                () => Run(() => InstallRenoDxEngineAsync(RenoDxEngine.UnityEngine, forceUeExtended: false)),
+                () => !IsBusy && CanInstallUnityRenoDx);
             RenoDxUpdateCommand = new RelayCommand(() => Run(CheckRenoDxUpdateAsync), () => !IsBusy && RenoDxRecords.Get(GameId) != null);
             RenoDxUninstallCommand = new RelayCommand(() => Run(UninstallRenoDxAsync), () => !IsBusy && RenoDxRecords.Get(GameId) != null);
             OpenRenoDxExternalUrlCommand = new RelayCommand(OpenRenoDxExternalUrl, () => RenoDxExternalUrl != null);
@@ -111,7 +158,7 @@ namespace HdrUpscaleManager.UI
             LumaUpdateCommand = new RelayCommand(() => Run(CheckLumaUpdateAsync), () => !IsBusy && LumaRecords.Get(GameId) != null);
             LumaUninstallCommand = new RelayCommand(() => Run(UninstallLumaAsync), () => !IsBusy && LumaRecords.Get(GameId) != null);
 
-            DxvkInstallCommand = new RelayCommand(() => Run(InstallDxvkAsync), () => !IsBusy);
+            DxvkInstallCommand = new RelayCommand(() => Run(InstallDxvkAsync), () => !IsBusy && CanInstallDxvk);
             DxvkUpdateCommand = new RelayCommand(() => Run(CheckDxvkUpdateAsync), () => !IsBusy && DxvkRecords.Get(GameId) != null);
             DxvkUninstallCommand = new RelayCommand(() => Run(UninstallDxvkAsync), () => !IsBusy && DxvkRecords.Get(GameId) != null);
 
@@ -272,6 +319,44 @@ namespace HdrUpscaleManager.UI
             catch (Exception ex)
             {
                 Log.Error(ex, $"RenoDX install failed for '{GameName}'.");
+                StatusText = $"RenoDX install failed: {ex.Message}";
+                api.Dialogs.ShowErrorMessage(StatusText, "Install RenoDX");
+            }
+        }
+
+        /* Explicit-control counterpart to InstallRenoDxAsync's best-effort button — forces a
+           specific engine build (and, for Unreal, a specific UE-Extended choice) rather than
+           auto-detecting. No RenoDxRecords entry is written here: generic engine installs have
+           no wiki version to track, so update-check/uninstall stay scoped to matched installs
+           only, same as before this moved from the game's right-click menu into this window. */
+        private async Task InstallRenoDxEngineAsync(RenoDxEngine engine, bool? forceUeExtended)
+        {
+            var engineLabel = engine == RenoDxEngine.UnrealEngine
+                ? (forceUeExtended == true ? "Unreal Engine, UE-Extended" : "Unreal Engine, generic")
+                : "Unity, generic";
+            StatusText = $"Installing RenoDX ({engineLabel})…";
+            try
+            {
+                RemoteManifest manifest = null;
+                if (engine == RenoDxEngine.UnrealEngine)
+                    manifest = (await new ManifestService(userDataPath).FetchAsync().ConfigureAwait(true))?.Manifest;
+
+                var useUeExtended = forceUeExtended ?? RenoDxService.ShouldUseUeExtended(GameName, manifest);
+                var result = await RenoDxService
+                    .InstallGenericAsync(Game.InstallDirectory, engine, useUeExtended, manifest)
+                    .ConfigureAwait(true);
+
+                if (!result.Success)
+                {
+                    StatusText = result.Error;
+                    return;
+                }
+
+                StatusText = $"Installed RenoDX ({engineLabel}).";
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, $"RenoDX {engineLabel} install failed for '{GameName}'.");
                 StatusText = $"RenoDX install failed: {ex.Message}";
                 api.Dialogs.ShowErrorMessage(StatusText, "Install RenoDX");
             }

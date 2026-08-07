@@ -39,6 +39,26 @@ namespace HdrUpscaleManager.Tests
         }
 
         [Fact]
+        public void Inspect_32BitD3D8Import_DetectsD3D8()
+        {
+            var path = WritePe(false, "d3d8.dll");
+
+            var result = PeInspector.Inspect(path);
+
+            Assert.Equal(GraphicsApi.D3D8, result.Api);
+        }
+
+        [Fact]
+        public void Inspect_D3D8AndD3D9Imports_PrefersD3D9()
+        {
+            var path = WritePe(false, "d3d8.dll", "d3d9.dll");
+
+            var result = PeInspector.Inspect(path);
+
+            Assert.Equal(GraphicsApi.D3D9, result.Api);
+        }
+
+        [Fact]
         public void Inspect_64BitVulkanImport_DetectsVulkanAndBitness()
         {
             var path = WritePe(true, "vulkan-1.dll");

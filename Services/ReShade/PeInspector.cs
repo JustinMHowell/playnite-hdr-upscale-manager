@@ -21,6 +21,7 @@ namespace HdrUpscaleManager.Services.ReShade
         private static readonly Dictionary<string, GraphicsApi> DllMap =
             new Dictionary<string, GraphicsApi>(StringComparer.OrdinalIgnoreCase)
             {
+                ["d3d8.dll"] = GraphicsApi.D3D8,
                 ["d3d9.dll"] = GraphicsApi.D3D9,
                 ["d3d10.dll"] = GraphicsApi.D3D10,
                 ["d3d10_1.dll"] = GraphicsApi.D3D10,
@@ -32,12 +33,13 @@ namespace HdrUpscaleManager.Services.ReShade
 
         private static readonly Dictionary<GraphicsApi, int> Priority = new Dictionary<GraphicsApi, int>
         {
-            [GraphicsApi.D3D12] = 6,
-            [GraphicsApi.Vulkan] = 5,
-            [GraphicsApi.D3D11] = 4,
-            [GraphicsApi.D3D10] = 3,
-            [GraphicsApi.OpenGl] = 2,
-            [GraphicsApi.D3D9] = 1,
+            [GraphicsApi.D3D12] = 7,
+            [GraphicsApi.Vulkan] = 6,
+            [GraphicsApi.D3D11] = 5,
+            [GraphicsApi.D3D10] = 4,
+            [GraphicsApi.OpenGl] = 3,
+            [GraphicsApi.D3D9] = 2,
+            [GraphicsApi.D3D8] = 1,
             [GraphicsApi.Unknown] = 0,
         };
 

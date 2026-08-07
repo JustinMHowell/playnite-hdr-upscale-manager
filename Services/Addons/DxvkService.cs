@@ -63,6 +63,9 @@ namespace HdrUpscaleManager.Services.Addons
             string[] requiredDlls;
             switch (info.Api)
             {
+                case GraphicsApi.D3D8:
+                    requiredDlls = new[] { "d3d8.dll" };
+                    break;
                 case GraphicsApi.D3D9:
                     requiredDlls = new[] { "d3d9.dll" };
                     break;
