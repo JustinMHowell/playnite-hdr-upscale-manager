@@ -17,7 +17,7 @@ namespace HdrUpscaleManager.Plugin
         private JsonRecordStore<RenoDxInstalledRecord> RenoDxRecords =>
             new JsonRecordStore<RenoDxInstalledRecord>(GetPluginUserDataPath(), "renodx_installs.json");
 
-        private IEnumerable<GameMenuItem> BuildRenoDxMenuItems(Playnite.SDK.Models.Game game)
+        private IEnumerable<GameMenuItem> BuildRenoDxMenuItems(Playnite.SDK.Models.Game game, RemoteManifest cachedManifest)
         {
             yield return new GameMenuItem
             {
@@ -33,26 +33,42 @@ namespace HdrUpscaleManager.Plugin
                 Action = async _ => await InstallRenoDxAutoDetectAsync(game)
             };
 
-            yield return new GameMenuItem
-            {
-                Description = "Install RenoDX (Unreal Engine, generic)",
-                MenuSection = "HDR & Upscale Manager",
-                Action = async _ => await InstallRenoDxAsync(game, RenoDxEngine.UnrealEngine, forceUeExtended: null)
-            };
+            /* Cheap local-directory scan (RenoDxEngineDetector — same detector "auto-detect"
+               already uses at click-time), run here at menu-build-time instead so the
+               engine-specific items below only show up for the engine that's actually there —
+               offering "Unreal Engine, generic" on a Unity game was just noise. Falls back to
+               showing both if detection can't tell (unknown engine, or the game isn't installed
+               yet), same as it always has — this only narrows, never wrongly excludes. */
+            var detectedEngine = RenoDxEngineDetector.Detect(
+                game.InstallDirectory, game.Name,
+                cachedManifest?.InstallPathOverrides, cachedManifest?.EngineHintOverrides).Engine;
 
-            yield return new GameMenuItem
+            if (detectedEngine == null || detectedEngine == RenoDxEngine.UnrealEngine)
             {
-                Description = "Install RenoDX (Unreal Engine, UE-Extended)",
-                MenuSection = "HDR & Upscale Manager",
-                Action = async _ => await InstallRenoDxAsync(game, RenoDxEngine.UnrealEngine, forceUeExtended: true)
-            };
+                yield return new GameMenuItem
+                {
+                    Description = "Install RenoDX (Unreal Engine, generic)",
+                    MenuSection = "HDR & Upscale Manager",
+                    Action = async _ => await InstallRenoDxAsync(game, RenoDxEngine.UnrealEngine, forceUeExtended: null)
+                };
 
-            yield return new GameMenuItem
+                yield return new GameMenuItem
+                {
+                    Description = "Install RenoDX (Unreal Engine, UE-Extended)",
+                    MenuSection = "HDR & Upscale Manager",
+                    Action = async _ => await InstallRenoDxAsync(game, RenoDxEngine.UnrealEngine, forceUeExtended: true)
+                };
+            }
+
+            if (detectedEngine == null || detectedEngine == RenoDxEngine.UnityEngine)
             {
-                Description = "Install RenoDX (Unity, generic)",
-                MenuSection = "HDR & Upscale Manager",
-                Action = async _ => await InstallRenoDxAsync(game, RenoDxEngine.UnityEngine, forceUeExtended: false)
-            };
+                yield return new GameMenuItem
+                {
+                    Description = "Install RenoDX (Unity, generic)",
+                    MenuSection = "HDR & Upscale Manager",
+                    Action = async _ => await InstallRenoDxAsync(game, RenoDxEngine.UnityEngine, forceUeExtended: false)
+                };
+            }
 
             var record = RenoDxRecords.Get(game.Id.ToString());
             if (record != null)
@@ -77,6 +93,8 @@ namespace HdrUpscaleManager.Plugin
         {
             try
             {
+                if (!await EnsureReShadeInstalledAsync(game, "RenoDX")) return;
+
                 RemoteManifest manifest = null;
                 if (engine == RenoDxEngine.UnrealEngine)
                     manifest = (await new ManifestService(GetPluginUserDataPath()).FetchAsync().ConfigureAwait(false))?.Manifest;
@@ -102,6 +120,8 @@ namespace HdrUpscaleManager.Plugin
         {
             try
             {
+                if (!await EnsureReShadeInstalledAsync(game, "RenoDX")) return;
+
                 var manifest = (await new ManifestService(GetPluginUserDataPath()).FetchAsync().ConfigureAwait(false))?.Manifest;
                 var detection = RenoDxEngineDetector.Detect(
                     game.InstallDirectory, game.Name, manifest?.InstallPathOverrides, manifest?.EngineHintOverrides);
@@ -140,6 +160,8 @@ namespace HdrUpscaleManager.Plugin
         {
             try
             {
+                if (!await EnsureReShadeInstalledAsync(game, "RenoDX")) return;
+
                 var manifestService = new ManifestService(GetPluginUserDataPath());
                 var manifestResult = await manifestService.FetchAsync().ConfigureAwait(false);
                 var nameOverrides = manifestResult?.Manifest?.WikiNameOverrides;

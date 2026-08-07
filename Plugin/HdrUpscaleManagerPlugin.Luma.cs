@@ -62,6 +62,8 @@ namespace HdrUpscaleManager.Plugin
                     return;
                 }
 
+                if (!await EnsureReShadeInstalledAsync(game, "Luma")) return;
+
                 var wikiCacheDir = Path.Combine(GetPluginUserDataPath(), "LumaWikiCache");
                 var result = await LumaService
                     .InstallForGameAsync(game.InstallDirectory, game.Name, wikiCacheDir, manifest?.LumaNameOverrides)

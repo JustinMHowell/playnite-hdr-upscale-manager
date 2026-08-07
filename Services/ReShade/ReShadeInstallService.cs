@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Net.Http;
 using System.Threading.Tasks;
@@ -29,6 +30,22 @@ namespace HdrUpscaleManager.Services.ReShade
             Directory.CreateDirectory(cacheDirectory);
         }
 
+        /* No-network check for RenoDX/Luma install flows that need ReShade present as a host
+           first (see PLAN.md — RenoDX/Luma are themselves ReShade addons, ReShade alone isn't
+           an HDR feature). Just checks whether the proxy DLL a ReShade install would use is
+           already sitting in the game folder — doesn't verify it's actually ReShade specifically
+           (vs. DXVK's own same-named DLL, or the game's real one), same ambiguity InstallAsync
+           itself already lives with via its BackupIfNeeded rename-not-overwrite step. */
+        public static bool IsInstalled(string gameInstallPath)
+        {
+            var exePath = PeInspector.FindGameExecutable(gameInstallPath);
+            if (exePath == null) return false;
+
+            var info = PeInspector.Inspect(exePath);
+            var proxyDllName = info != null ? ReShadeProxyDll.GetProxyDllName(info.Api) : null;
+            return proxyDllName != null && File.Exists(Path.Combine(gameInstallPath, proxyDllName));
+        }
+
         /* Always installs whatever version reshade.me currently serves — there's no version
            picker yet, this will become configurable later. */
         public async Task<ReShadeInstallResult> InstallAsync(string gameInstallPath)
@@ -47,7 +64,16 @@ namespace HdrUpscaleManager.Services.ReShade
 
             var versionInfo = await ReShadeVersionChecker.CheckLatestAsync().ConfigureAwait(false);
             if (versionInfo == null)
-                return Fail("Could not determine the latest ReShade version.");
+            {
+                // reshade.me is unreachable (offline, or the site changed) — fall back to the
+                // newest version we've already downloaded before, rather than failing outright
+                // when a perfectly usable cached installer is sitting right there.
+                versionInfo = FindNewestCachedVersion();
+                if (versionInfo == null)
+                    return Fail("Could not determine the latest ReShade version, and no cached installer is available offline.");
+
+                Log.Warn($"Could not reach reshade.me — using cached ReShade {versionInfo.Version} instead of checking for a newer version.");
+            }
 
             var installerPath = await DownloadInstallerAsync(versionInfo).ConfigureAwait(false);
             if (installerPath == null)
@@ -84,6 +110,38 @@ namespace HdrUpscaleManager.Services.ReShade
                 Api = info.Api,
                 Version = versionInfo.Version
             };
+        }
+
+        /* Cache layout is cacheDirectory/<version>/ReShade_Setup_<version>_Addon.exe (see
+           DownloadInstallerAsync) — folder names double as version strings, so this just needs
+           to find the highest one that still has a valid installer inside. Url is left blank:
+           DownloadInstallerAsync's own cache-hit check finds the file by path before ever
+           looking at Url, so nothing tries to re-download using it. */
+        private ReShadeVersionInfo FindNewestCachedVersion()
+        {
+            Version best = null;
+            string bestRaw = null;
+
+            IEnumerable<string> versionDirs;
+            try { versionDirs = Directory.EnumerateDirectories(cacheDirectory); }
+            catch { return null; }
+
+            foreach (var dir in versionDirs)
+            {
+                var raw = Path.GetFileName(dir);
+                if (!Version.TryParse(raw, out var parsed)) continue;
+
+                var installerPath = Path.Combine(dir, $"ReShade_Setup_{raw}_Addon.exe");
+                if (!File.Exists(installerPath) || !IsValidPeFile(installerPath)) continue;
+
+                if (best == null || parsed > best)
+                {
+                    best = parsed;
+                    bestRaw = raw;
+                }
+            }
+
+            return bestRaw == null ? null : new ReShadeVersionInfo { Version = bestRaw, Url = null };
         }
 
         private async Task<string> DownloadInstallerAsync(ReShadeVersionInfo versionInfo)

@@ -84,7 +84,7 @@ namespace HdrUpscaleManager.Plugin
             }
 
             foreach (var item in BuildReShadeMenuItems(game)) yield return item;
-            foreach (var item in BuildRenoDxMenuItems(game)) yield return item;
+            foreach (var item in BuildRenoDxMenuItems(game, cachedManifest)) yield return item;
             foreach (var item in BuildLumaMenuItems(game)) yield return item;
             foreach (var item in BuildDxvkMenuItems(game)) yield return item;
             foreach (var item in BuildOptiScalerMenuItems(game)) yield return item;
