@@ -1,11 +1,11 @@
 using HdrUpscaleManager.Services;
 using Playnite.SDK;
+using Playnite.SDK.Events;
 using Playnite.SDK.Plugins;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
-using System.Windows.Controls;
 
 namespace HdrUpscaleManager.Plugin
 {
@@ -19,8 +19,6 @@ namespace HdrUpscaleManager.Plugin
         /* Playnite identifies add-ons by this Id — must be unique per plugin. */
         public override Guid Id { get; } = Guid.Parse("5C15D52C-22E9-4668-881D-C5DAF69A2F0E");
 
-        private readonly HdrUpscaleManagerSettings settings;
-
         public static string PluginVersion =>
             typeof(HdrUpscaleManagerPlugin).Assembly
                 .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
@@ -30,28 +28,32 @@ namespace HdrUpscaleManager.Plugin
         public HdrUpscaleManagerPlugin(IPlayniteAPI api) : base(api)
         {
             Log.Initialize(System.IO.Path.Combine(GetPluginUserDataPath(), "logs"));
-            settings = new HdrUpscaleManagerSettings(this);
-            Properties = new GenericPluginProperties { HasSettings = true };
             logger.Info($"HDR & Upscale Manager v{PluginVersion} loaded.");
             Log.Info($"HDR & Upscale Manager v{PluginVersion} loaded.");
         }
 
-        public override ISettings GetSettings(bool firstRunSettings) => settings;
-
-        public override UserControl GetSettingsView(bool firstRunSettings)
+        /* Fires once Playnite (Desktop or Fullscreen — this hook is mode-agnostic) has
+           finished starting up. Refreshes the manifest cache in the background so it's
+           current by the time the user opens a game menu, without blocking startup or
+           showing any UI — read-only data hygiene, not an action taken on the user's
+           behalf (PLAN.md §5). Failures are logged only; a stale/local cache is fine. */
+        public override async void OnApplicationStarted(OnApplicationStartedEventArgs args)
         {
-            return new HdrUpscaleManagerSettingsView { DataContext = settings };
+            try
+            {
+                var result = await new ManifestService(GetPluginUserDataPath()).FetchAsync();
+                Log.Info(result?.Manifest != null
+                    ? $"Startup manifest refresh: source={result.Source}, version={result.Manifest.Version}."
+                    : "Startup manifest refresh: no network and no local cache yet.");
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "Startup manifest refresh failed.");
+            }
         }
 
         public override IEnumerable<MainMenuItem> GetMainMenuItems(GetMainMenuItemsArgs args)
         {
-            yield return new MainMenuItem
-            {
-                Description = "Say hello",
-                MenuSection = "@HDR & Upscale Manager",
-                Action = _ => PlayniteApi.Dialogs.ShowMessage(settings.Greeting, "HDR & Upscale Manager")
-            };
-
             yield return new MainMenuItem
             {
                 Description = "Check manifest sync",

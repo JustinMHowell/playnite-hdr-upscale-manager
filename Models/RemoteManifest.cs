@@ -114,9 +114,19 @@ namespace HdrUpscaleManager.Models
 
         private static Dictionary<string, T> CaseInsensitive<T>(Dictionary<string, T> source)
         {
-            return source == null
-                ? null
-                : new Dictionary<string, T>(source, StringComparer.OrdinalIgnoreCase);
+            if (source == null) return null;
+
+            /* The Dictionary(IDictionary, IEqualityComparer) constructor throws if two source
+               keys collide once case is ignored (confirmed live 2026-08-07 — upstream's
+               hand-edited manifest.json has had this exact bug before, e.g. WATCH_DOGS2 vs
+               Watch_Dogs2). Build it key-by-key instead so a collision just picks a winner
+               rather than taking down the whole manifest fetch. */
+            var result = new Dictionary<string, T>(StringComparer.OrdinalIgnoreCase);
+            foreach (var kv in source)
+            {
+                result[kv.Key] = kv.Value;
+            }
+            return result;
         }
     }
 

@@ -73,6 +73,25 @@ namespace HdrUpscaleManager.Tests
         }
 
         [Fact]
+        public void Normalize_KeysCollidingOnlyByCase_DoesNotThrow()
+        {
+            // Regression for a live failure (2026-08-07): upstream's hand-edited manifest.json
+            // has shipped exact-duplicate keys differing only by case before (e.g. WATCH_DOGS2
+            // vs Watch_Dogs2) — the Dictionary(IDictionary, IEqualityComparer) constructor
+            // throws on that, which took down the entire manifest fetch. Deserializing via
+            // Newtonsoft (used elsewhere in JSON tests) preserves both keys distinctly since
+            // JSON keys are case-sensitive by default, so build the collision directly instead.
+            var wikiNameOverrides = new Dictionary<string, string>();
+            wikiNameOverrides["WATCH_DOGS2"] = "Watch Dogs 2 (legacy)";
+            wikiNameOverrides["Watch_Dogs2"] = "Watch Dogs 2";
+            var manifest = new RemoteManifest { WikiNameOverrides = wikiNameOverrides };
+
+            RemoteManifest.Normalize(manifest);
+
+            Assert.True(manifest.WikiNameOverrides.ContainsKey("watch_dogs2"));
+        }
+
+        [Fact]
         public void IsBlacklisted_CaseInsensitiveMatch_ReturnsTrue()
         {
             var manifest = new RemoteManifest { Blacklist = new List<string> { "Rainbow Six Siege" } };
