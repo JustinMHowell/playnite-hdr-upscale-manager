@@ -56,12 +56,20 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- HdrUpscaleManager.Tests lives in a subfolder of this project's own directory —
-         without this, the default **/*.cs glob below would try to compile its test files
-         (and xunit references) into this project too. -->
-    <Compile Remove="HdrUpscaleManager.Tests\**" />
-    <EmbeddedResource Remove="HdrUpscaleManager.Tests\**" />
-    <None Remove="HdrUpscaleManager.Tests\**" />
+    <!-- HdrUpscaleManager.Tests, HdrUpscaleManager.UiTests, and reference\RHI (a gitignored
+         local clone of upstream RankFTW/RHI kept for diffing — see .gitignore) all live in
+         subfolders of this project's own directory. Without this, the default item globs
+         below would try to pull their files into this project too — .cs test files (and
+         xunit/FlaUI references), and for reference\RHI specifically, its WinUI 3 .xaml files
+         get auto-included as WPF Page/ApplicationDefinition items and fail to parse (they use
+         WinUI-only markup like XamlControlsResources/RequestedTheme that WPF's XAML compiler
+         doesn't recognize). -->
+    <Compile Remove="HdrUpscaleManager.Tests\**;HdrUpscaleManager.UiTests\**;reference\**" />
+    <EmbeddedResource Remove="HdrUpscaleManager.Tests\**;HdrUpscaleManager.UiTests\**;reference\**" />
+    <None Remove="HdrUpscaleManager.Tests\**;HdrUpscaleManager.UiTests\**;reference\**" />
+    <Page Remove="reference\**" />
+    <ApplicationDefinition Remove="reference\**" />
+    <Resource Remove="reference\**" />
   </ItemGroup>
 
 </Project>
