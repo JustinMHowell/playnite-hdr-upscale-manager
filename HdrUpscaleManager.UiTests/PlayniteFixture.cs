@@ -24,18 +24,51 @@ namespace HdrUpscaleManager.UiTests
         public Application App { get; }
 
         private readonly JToken previousAccessibilityValue;
+        private readonly string exePath;
 
-        public PlayniteFixture()
+        public PlayniteFixture() : this(beforeLaunch: null)
+        {
+        }
+
+        private PlayniteFixture(Action beforeLaunch)
         {
             Automation = new UIA3Automation();
 
-            var exePath = ResolveExePath();
-            KillIfRunning();
+            exePath = ResolveExePath();
+            KillIfRunning(exePath);
+
+            // Runs after any already-running Playnite is fully closed and before the new
+            // instance launches — the one ordering a test needs to observe "what happens on
+            // a truly fresh launch" (e.g. deleting manifest.json to watch OnApplicationStarted
+            // recreate it) without a race against either the old instance or the new one.
+            beforeLaunch?.Invoke();
 
             previousAccessibilityValue = PlayniteConfigAccessibility.ForceAlwaysOn();
 
-            App = Application.Launch(exePath);
+            // --nolibupdate skips the startup library-update scan (ProcessStartupLibUpdate in
+            // Playnite's own MainViewModelBase.cs) — confirmed from source this only gates that
+            // scan, not plugin loading or OnApplicationStarted (InitializeView fires that
+            // unconditionally, before the update step even runs), so tests relying on
+            // OnApplicationStarted are unaffected. What it DOES fix: DesktopApplication.cs only
+            // deletes the safe-startup flag file (see StartupErrorDialogUiTests) after this
+            // scan finishes — on a large real library that scan can run well past a test's
+            // patience, which is exactly what made that test flaky before this flag was added.
+            //
+            // Deliberately NOT passing --hidesplashscreen: tried it alongside --nolibupdate and
+            // GetMainWindow started timing out completely (confirmed live 2026-08-08) — with no
+            // splash window, there's apparently nothing for FlaUI's Process.MainWindowHandle-
+            // based main-window discovery to latch onto early, including while the "Startup
+            // Error" MessageBox (a separate native dialog, not a WPF window) is up. Not worth
+            // the splash-transition retries this was meant to save given it breaks dialog
+            // detection outright.
+            App = Application.Launch(exePath, "--nolibupdate");
         }
+
+        /* IClassFixture<T> requires a single public constructor, so the extra beforeLaunch
+           hook stays private and reachable only through this factory — used by tests that
+           manage their own PlayniteFixture instance instead of sharing one via IClassFixture
+           (see ManifestAutoDownloadUiTests). */
+        public static PlayniteFixture LaunchFresh(Action beforeLaunch) => new PlayniteFixture(beforeLaunch);
 
         /* Confirmed live (2026-08-08): Playnite shows a "Please wait while the application
            opens" splash first (Name matches that literal string, 0-1 children), then during
@@ -107,7 +140,15 @@ namespace HdrUpscaleManager.UiTests
 
             try
             {
-                App.Close();
+                // Same reasoning as KillIfRunning: --shutdown goes through Playnite's own
+                // Quit()/ReleaseResources() path via its pipe, rather than App.Close()'s
+                // CloseMainWindow()-style approach that can silently no-op if the process
+                // isn't in a state to respond to a window message right at this instant.
+                using (var shutdownSignal = Process.Start(exePath, "--shutdown"))
+                {
+                    shutdownSignal?.WaitForExit(10_000);
+                }
+
                 var deadline = DateTime.UtcNow.AddSeconds(10);
                 while (!App.HasExited && DateTime.UtcNow < deadline)
                 {
@@ -208,20 +249,45 @@ namespace HdrUpscaleManager.UiTests
             return null;
         }
 
-        /* Prefers a graceful close (WM_CLOSE) over Kill() — a hard-killed Playnite flags its
-           own next launch as "closed unexpectedly" and shows a blocking "start in safe mode?"
-           dialog (confirmed live 2026-08-08), which would disable our own addon if answered
-           wrong and just adds another dialog GetMainWindow has to fight through either way. */
-        private static void KillIfRunning()
+        /* Goes through Playnite's own shutdown path instead of CloseMainWindow(): --shutdown,
+           launched as a brand-new short-lived process, detects the running instance's
+           single-instance mutex, sends a Shutdown command over its existing named pipe, and
+           the running instance handles that by calling its own Quit()/ReleaseResources() —
+           confirmed by reading PlayniteApplication.cs directly, not guessed. CloseMainWindow()
+           depends on the process having a responsive main window at that exact instant (e.g.
+           it silently does nothing if a modal dialog has focus, or during its own startup
+           window) — a real risk here since these tests routinely relaunch Playnite while it
+           may still be settling from a previous run. Kill() stays as a last-resort fallback
+           only: a hard-killed Playnite flags its own next launch as "closed unexpectedly" and
+           shows a blocking "start in safe mode?" dialog (confirmed live 2026-08-08, and again
+           2026-08-08 when a forced kill elsewhere left exactly that flag set — see
+           StartupErrorDialogUiTests), which would disable our own addon if answered wrong. */
+        private static void KillIfRunning(string exePath)
         {
+            if (Process.GetProcessesByName("Playnite.DesktopApp").Length == 0) return;
+
+            try
+            {
+                using (var shutdownSignal = Process.Start(exePath, "--shutdown"))
+                {
+                    shutdownSignal?.WaitForExit(10_000);
+                }
+            }
+            catch
+            {
+                // Best-effort — the Kill() fallback below still catches anything left running.
+            }
+
+            var deadline = DateTime.UtcNow.AddSeconds(15);
+            while (DateTime.UtcNow < deadline && Process.GetProcessesByName("Playnite.DesktopApp").Length > 0)
+            {
+                System.Threading.Thread.Sleep(200);
+            }
+
             foreach (var p in Process.GetProcessesByName("Playnite.DesktopApp"))
             {
-                p.CloseMainWindow();
-                if (!p.WaitForExit(10_000))
-                {
-                    p.Kill();
-                    p.WaitForExit(15_000);
-                }
+                p.Kill();
+                p.WaitForExit(15_000);
             }
         }
     }

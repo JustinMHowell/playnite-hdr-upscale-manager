@@ -15,12 +15,9 @@ namespace HdrUpscaleManager.UiTests
        clicks through to the addon's own menu item, and confirms the click actually did
        something by checking the manifest.json file on disk got a fresh write, not just that
        some dialog appeared. See README.md in this folder for setup. */
+    [Collection(PlayniteUiCollection.Name)]
     public class ManifestSyncUiTests : IClassFixture<PlayniteFixture>
     {
-        // Playnite's own Id for this plugin (HdrUpscaleManagerPlugin.Id) — the folder Playnite
-        // stores per-plugin data under is named after it.
-        private const string PluginId = "5C15D52C-22E9-4668-881D-C5DAF69A2F0E";
-
         private readonly PlayniteFixture fixture;
         private readonly ITestOutputHelper output;
 
@@ -33,9 +30,7 @@ namespace HdrUpscaleManager.UiTests
         [Fact]
         public void CheckManifestSync_ClickedFromMainMenu_RefreshesManifestFileOnDisk()
         {
-            var manifestPath = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                "Playnite", "ExtensionsData", PluginId, "manifest.json");
+            var manifestPath = PluginPaths.ManifestPath;
 
             var mainWindow = fixture.GetMainWindow();
 
