@@ -20,11 +20,12 @@ namespace HdrUpscaleManager.UiTests
        AddonInstallService never touches any pre-existing game file (there isn't one to
        back up — addon files aren't part of the original game).
 
-       Defaults to "The Witcher 3: Wild Hunt" — confirmed on the RenoDX wiki's matched list
-       with a direct .addon64 download (see GAMES-TO-TEST.md), so the plain "Install" button's
-       best-effort wiki-match path is expected to succeed on its own, without needing the
-       engine-specific fallback buttons. Override with HUM_UITEST_RENODX_GAME if your library
-       titles it differently, or to point this at a different already-matched game.
+       Runs against every game in TestGames below — each one confirmed on the RenoDX wiki's
+       matched list with a direct .addon64 download (see GAMES-TO-TEST.md), so the plain
+       "Install" button's best-effort wiki-match path is expected to succeed on its own,
+       without needing the engine-specific fallback buttons. If your library titles one of
+       these differently, edit the literal string in TestGames rather than adding an env var —
+       there's no single "override" that makes sense once more than one game is covered.
 
        What this doesn't cover: the wiki/manifest fetches in this codebase are all "try the
        network first, fall back to the on-disk cache only if that throws" (see
@@ -34,27 +35,30 @@ namespace HdrUpscaleManager.UiTests
        doing that reliably would mean blocking this machine's real network access, which is
        outside what an automated test here should do unattended. */
     [Collection(PlayniteUiCollection.Name)]
-    public class RenoDxInstallUiTests : IClassFixture<PlayniteFixture>
+    public class RenoDxInstallUiTests
     {
         private const string RecordStoreFileName = "renodx_installs.json";
         private const string WikiCacheFileName = "renodx_wiki_mods.json";
         private const string WikiCacheDirName = "RenoDxWikiCache";
 
-        private readonly PlayniteFixture fixture;
         private readonly ITestOutputHelper output;
 
-        public RenoDxInstallUiTests(PlayniteFixture fixture, ITestOutputHelper output)
+        public RenoDxInstallUiTests(ITestOutputHelper output)
         {
-            this.fixture = fixture;
             this.output = output;
         }
 
-        [Fact]
-        public void InstallThenUninstallRenoDx_FromManagerWindow_DownloadsFileAndCleansUpFully()
+        /* Deliberately NOT IClassFixture<PlayniteFixture>: that would share one Playnite
+           process across every [InlineData] case, and a leftover open window or stale focus
+           from one game's run bled into the next (confirmed live 2026-08-08 — Hollow Knight's
+           case saw a manager window still open from the prior case, then its own navigation
+           failed against that contaminated state). Each case now launches and tears down its
+           own Playnite instance, same as ManifestAutoDownloadUiTests/StartupErrorDialogUiTests. */
+        [Theory]
+        [InlineData("The Witcher 3: Wild Hunt")]
+        [InlineData("Hollow Knight")]
+        public void InstallThenUninstallRenoDx_FromManagerWindow_DownloadsFileAndCleansUpFully(string gameName)
         {
-            var gameName = Environment.GetEnvironmentVariable("HUM_UITEST_RENODX_GAME");
-            if (string.IsNullOrWhiteSpace(gameName)) gameName = "The Witcher 3: Wild Hunt";
-
             var preExisting = FindRecordByGameName(gameName);
             if (preExisting != null)
             {
@@ -63,11 +67,11 @@ namespace HdrUpscaleManager.UiTests
                     $"{preExisting.InstallPath}) before this test started. This test installs " +
                     "then uninstalls RenoDX as part of its own run, so it refuses to run " +
                     "against a game that already has a real install it didn't create itself — " +
-                    "uninstall RenoDX for this game manually first, or point " +
-                    "HUM_UITEST_RENODX_GAME at a different, currently-clean matched game.");
+                    "uninstall RenoDX for this game manually first.");
             }
 
             var testStartedUtc = DateTime.UtcNow;
+            using var fixture = new PlayniteFixture();
             fixture.GetMainWindow();
             var managerWindow = ManagerWindowNavigation.Open(fixture, gameName, output);
 

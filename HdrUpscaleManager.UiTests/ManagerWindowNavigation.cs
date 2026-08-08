@@ -31,20 +31,48 @@ namespace HdrUpscaleManager.UiTests
         {
             var desktop = fixture.Automation.GetDesktop();
 
-            Process.Start(new ProcessStartInfo(
-                $"playnite://playnite/search/{Uri.EscapeDataString(gameName)}") { UseShellExecute = true });
+            // The URI is delivered by launching a brand-new throwaway Playnite.DesktopApp.exe,
+            // which detects the already-running instance's mutex and forwards the command over
+            // its named pipe (see PlayniteApplication.cs) — confirmed live 2026-08-08 that this
+            // can race Playnite's own pipe-server setup right after a fresh launch: the search
+            // window opens but stays on its empty placeholder text, with no query ever
+            // delivered, regardless of what name was searched for. Re-firing the URI a few
+            // times (each with its own short wait) resolves that race instead of assuming the
+            // first shot landed.
+            //
+            // Deliberately checking for ANY result row (ControlType.ListItem) rather than an
+            // exact name match against gameName: a live search result's own accessible Name
+            // can carry extra decoration beyond the plain title (confirmed live 2026-08-08 —
+            // one result's Name included digits that don't appear in the game's actual Name,
+            // which is what the addon's own window title/install records use for verification
+            // further down). The search itself does fuzzy matching against the real Game.Name,
+            // so an exact string here would just be redundant with — and less reliable than —
+            // that fuzzy ranking.
+            AutomationElement searchResult = null;
+            for (var attempt = 1; attempt <= 3 && searchResult == null; attempt++)
+            {
+                Process.Start(new ProcessStartInfo(
+                    $"playnite://playnite/search/{Uri.EscapeDataString(gameName)}") { UseShellExecute = true });
 
-            var searchResult = Retry.WhileNull(
-                () => desktop.FindFirstDescendant(cf => cf.ByName(gameName)),
-                timeout: TimeSpan.FromSeconds(15)).Result;
+                searchResult = Retry.WhileNull(
+                    () =>
+                    {
+                        // Scoped to the search window specifically, not the whole desktop —
+                        // ControlType.ListItem alone is far too broad (taskbar, Start menu,
+                        // any other open app's list views all have them too).
+                        var searchWindow = desktop.FindFirstDescendant(cf => cf.ByName("Playnite search"));
+                        return searchWindow?.FindFirstDescendant(cf => cf.ByControlType(ControlType.ListItem));
+                    },
+                    timeout: TimeSpan.FromSeconds(8)).Result;
+            }
 
             if (searchResult == null)
             {
                 Dump(output, "desktop (after search URI)", desktop);
                 throw new InvalidOperationException(
-                    $"'{gameName}' never appeared in the search results after firing " +
-                    $"playnite://playnite/search/... — either the URI didn't reach the running " +
-                    "instance, or no game matched. See the dumped tree above.");
+                    $"No search result appeared for '{gameName}' after firing " +
+                    $"playnite://playnite/search/... 3 times — either the URI never reached " +
+                    "the running instance, or no game matched. See the dumped tree above.");
             }
 
             // Runs the top result's default (Enter) action, which opens the library's per-game

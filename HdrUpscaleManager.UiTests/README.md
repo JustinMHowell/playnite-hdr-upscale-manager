@@ -8,7 +8,7 @@ four test classes:
 | `ManagerWindowUiTests` | Opening the per-game manager window renders every component section. UI shape only — installs nothing. |
 | `ManifestSyncUiTests` | Clicking "Check manifest sync" in the main menu re-fetches `manifest.json` on disk. |
 | `ManifestAutoDownloadUiTests` | A **fresh Playnite launch with no local `manifest.json`** re-downloads it automatically via `OnApplicationStarted`, with no click involved. The counterpart to `ManifestSyncUiTests` — see that class's own doc comment for why the two don't share a fixture. |
-| `RenoDxInstallUiTests` | A real RenoDX install/uninstall round trip through the manager window's actual buttons: the addon file lands in the game folder, the on-disk install record matches it, and uninstalling removes both, leaving the game folder exactly as it was. Defaults to "The Witcher 3: Wild Hunt" (see `GAMES-TO-TEST.md`) — override with `HUM_UITEST_RENODX_GAME`. |
+| `RenoDxInstallUiTests` | A real RenoDX install/uninstall round trip through the manager window's actual buttons: the addon file lands in the game folder, the on-disk install record matches it, and uninstalling removes both, leaving the game folder exactly as it was. A `[Theory]` with one `[InlineData]` case per game (currently The Witcher 3 and Hollow Knight — see `GAMES-TO-TEST.md` for why those two). |
 
 All four run against a real Playnite process, so they're serialized into one xUnit collection
 (`PlayniteUiCollection`, `DisableParallelization = true`) — otherwise xUnit's default of running
@@ -19,6 +19,14 @@ process at once. Run the whole project or a single class; either way they execut
 writes to your real Playnite plugin data under `%AppData%\Playnite\ExtensionsData\...` — it isn't
 a pure UI smoke test like the others. It refuses to run if that game already has a tracked RenoDX
 install going in, so it won't touch a real install you made outside of this test suite.
+
+Every game-specific test (`ManagerWindowUiTests`, `RenoDxInstallUiTests`) reaches its target game
+through `ManagerWindowNavigation.Open`, which drives Playnite's own global search
+(`playnite://playnite/search/<term>`, then Enter, then the sidebar's "More" button) rather than
+right-clicking the game directly in the library grid. That grid can be UI-virtualized on a large
+library — a game that isn't scrolled into view may not even have an automation element to find.
+Always route new per-game navigation through this same helper rather than re-adding a grid
+right-click.
 
 ## Isolation from the addon
 
@@ -47,12 +55,8 @@ install going in, so it won't touch a real install you made outside of this test
   Never commit a specific value for this — it's your local library, set it in your shell before
   running the tests, not in a file.
 
-## Optional environment variables
+## Optional environment variable
 
-- `HUM_UITEST_RENODX_GAME` — the exact title of the game `RenoDxInstallUiTests` installs/
-  uninstalls RenoDX against. Defaults to `The Witcher 3: Wild Hunt` if unset (see
-  `GAMES-TO-TEST.md` for why that one). Only set this if your library titles it differently, or
-  to point the test at a different game already confirmed on the RenoDX wiki's matched list.
 - `HUM_UITEST_PLAYNITE_EXE` — full path to `Playnite.DesktopApp.exe`. Only needed if Playnite
   isn't already running *and* it's not installed at the default
   `%LOCALAPPDATA%\Playnite\Playnite.DesktopApp.exe` location. If Playnite is already running,
@@ -70,11 +74,11 @@ Or run `ManagerWindowUiTests` from the Test Explorer in Visual Studio/Rider.
 ## If a selector breaks
 
 Playnite's own automation tree isn't something this repo can pin against — it's not our source,
-and it can change between Playnite versions/themes. The game-list lookup and context-menu clicks
-in `ManagerWindowUiTests.cs` are best-effort name matches. When one stops matching, the test
-dumps the live automation tree (via `AutomationTreeDumper`) to the xunit test output right before
-failing — paste that into the relevant `FindFirstDescendant`/`FindAllChildren` call and adjust
-the one selector that broke.
+and it can change between Playnite versions/themes. The search-URI lookup and context-menu
+clicks in `ManagerWindowNavigation.cs` are best-effort name matches. When one stops matching,
+the test dumps the live automation tree (via `AutomationTreeDumper`) to the xunit test output
+right before failing — paste that into the relevant `FindFirstDescendant`/`FindAllChildren` call
+and adjust the one selector that broke.
 
 ## What this deliberately doesn't do
 
