@@ -16,16 +16,26 @@ namespace HdrUpscaleManager.UiTests
        API directly). See RenoDxInstallUiTests' own doc comment for the reasoning that carries
        over unchanged.
 
-       Runs against Control (Ultimate Edition) — DLSS-only, no native FSR ever shipped, one of the
-       OptiScaler community's original DLSS->FSR swap case studies (see GAMES-TO-TEST.md's
-       "OptiScaler picks" section) — via the "Install (DLSS-only game)" button. None of the files
-       OptiScaler deploys (the resolved proxy DLL, OptiScaler.ini, OptiFG's support files) are
-       expected to already exist in a fresh Control install, so this doesn't exercise
-       FileBackup's restore-on-uninstall path — that's DxvkInstallUiTests' job (Mafia). */
+       Runs all three OptiScaler scenarios from GAMES-TO-TEST.md's "OptiScaler picks" section,
+       each via the manager-window button matching what the game actually ships:
+
+       - Control (Ultimate Edition): DLSS-only, no native FSR ever shipped — "Install (DLSS-only
+         game)" (dlssInputs: true).
+       - Deep Rock Galactic: ships DLSS + FSR2 natively, never patched to FSR3/4 — "Install (has
+         FSR/XeSS)" (dlssInputs: false), testing the FSR2->FSR4 override.
+       - The Riftbreaker: ships FSR 1.0 natively, no FSR2/3 patch found — same button, testing the
+         FSR1->FSR4 override.
+
+       None of the files OptiScaler deploys (the resolved proxy DLL, OptiScaler.ini, OptiFG's
+       support files) are expected to already exist in a fresh install of any of these three, so
+       this doesn't exercise FileBackup's restore-on-uninstall path — that's DxvkInstallUiTests'
+       job (Mafia). */
     [Collection(PlayniteUiCollection.Name)]
     public class OptiScalerInstallUiTests
     {
         private const string RecordStoreFileName = "optiscaler_installs.json";
+        private const string InstallDlssOnlyButton = "Install (DLSS-only game)";
+        private const string InstallHasFsrButton = "Install (has FSR/XeSS)";
 
         private readonly ITestOutputHelper output;
 
@@ -35,8 +45,10 @@ namespace HdrUpscaleManager.UiTests
         }
 
         [Theory]
-        [InlineData("Control Ultimate Edition")]
-        public void InstallThenUninstallOptiScaler_FromManagerWindow_DeploysFilesAndCleansUpFully(string gameName)
+        [InlineData("Control Ultimate Edition", InstallDlssOnlyButton)]
+        [InlineData("Deep Rock Galactic", InstallHasFsrButton)]
+        [InlineData("The Riftbreaker", InstallHasFsrButton)]
+        public void InstallThenUninstallOptiScaler_FromManagerWindow_DeploysFilesAndCleansUpFully(string gameName, string installButton)
         {
             var preExisting = FindRecordByGameName(gameName);
             if (preExisting != null)
@@ -55,7 +67,7 @@ namespace HdrUpscaleManager.UiTests
 
             try
             {
-                var record = ClickInstallUntilRecordAppears(managerWindow, gameName);
+                var record = ClickInstallUntilRecordAppears(managerWindow, gameName, installButton);
 
                 Assert.False(string.IsNullOrEmpty(record.DllName));
                 Assert.NotEmpty(record.InstalledFiles);
@@ -141,14 +153,14 @@ namespace HdrUpscaleManager.UiTests
            CommandManager requery race (see RenoDxInstallUiTests), not the slower disabled-button
            wait DxvkInstallUiTests needs: OptiScalerInstallDlssCommand's CanExecute is just
            "!IsBusy", no async graphics-API resolution to wait on. */
-        private OptiScalerRecordDto ClickInstallUntilRecordAppears(Window managerWindow, string gameName)
+        private OptiScalerRecordDto ClickInstallUntilRecordAppears(Window managerWindow, string gameName, string installButton)
         {
             const int maxAttempts = 10;
             OptiScalerRecordDto record = null;
 
             for (var attempt = 1; attempt <= maxAttempts && record == null; attempt++)
             {
-                ManagerSectionNavigation.ClickSectionButton(managerWindow, "OptiScaler (AMD)", "Install (DLSS-only game)", output);
+                ManagerSectionNavigation.ClickSectionButton(managerWindow, "OptiScaler (AMD)", installButton, output);
                 Retry.WhileFalse(
                     () => (record = FindRecordByGameName(gameName)) != null,
                     timeout: TimeSpan.FromSeconds(6),
