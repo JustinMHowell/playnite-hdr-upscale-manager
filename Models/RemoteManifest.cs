@@ -39,6 +39,16 @@ namespace HdrUpscaleManager.Models
         [JsonProperty("installPathOverrides")]
         public Dictionary<string, string> InstallPathOverrides { get; set; }
 
+        /* Per-game forced graphics-API hint (RHI's own short tokens — "DX9".."DX12", "OGL",
+           "VLK", sometimes multiple comma-separated) shared by ReShade and DXVK detection alike
+           — both hit the same gap this covers: a hand-rolled PE import-table walk can't read
+           every real game's binary correctly (confirmed live 2026-08-08 against The Witcher 3's
+           actual bin\x64_dx12\witcher3.exe — Is64Bit detected fine, Api came back Unknown; the
+           manifest's own "DX12" entry for this game is what this property finally wires up).
+           Distinct from the narrower, currently-unused dxvkApiOverrides below. */
+        [JsonProperty("graphicsApiOverrides")]
+        public Dictionary<string, string> GraphicsApiOverrides { get; set; }
+
         [JsonProperty("engineHintOverrides")]
         public Dictionary<string, string> EngineHintOverrides { get; set; }
 
@@ -104,6 +114,7 @@ namespace HdrUpscaleManager.Models
             manifest.WikiNameOverrides = CaseInsensitive(manifest.WikiNameOverrides);
             manifest.LumaNameOverrides = CaseInsensitive(manifest.LumaNameOverrides);
             manifest.InstallPathOverrides = CaseInsensitive(manifest.InstallPathOverrides);
+            manifest.GraphicsApiOverrides = CaseInsensitive(manifest.GraphicsApiOverrides);
             manifest.EngineHintOverrides = CaseInsensitive(manifest.EngineHintOverrides);
             manifest.GameNotes = CaseInsensitive(manifest.GameNotes);
             manifest.LumaGameNotes = CaseInsensitive(manifest.LumaGameNotes);

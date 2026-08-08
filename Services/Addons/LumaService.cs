@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
+using System.Linq;
 using System.Net.Http;
 using System.Threading.Tasks;
 using HdrUpscaleManager.Models.Addons;
@@ -162,18 +163,52 @@ namespace HdrUpscaleManager.Services.Addons
 
         public static LumaUninstallResult Uninstall(LumaInstalledRecord record)
         {
+            var installRoot = Path.GetFullPath(record.InstallPath).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
             var failures = new List<string>();
+
+            /* A zip-based install can nest files under subfolders it creates itself (e.g.
+               "Luma/INSIDE/Includes/..."), unlike RenoDX's single addon file straight in the
+               game root. Deleting only the tracked files left those now-empty subfolders behind
+               — confirmed live 2026-08-08 (a real Luma install/uninstall left an empty
+               Luma\Global, Luma\Includes, Luma\INSIDE\Includes tree in the game's own folder).
+               Collecting each file's ancestor directories up to (but excluding) the game's
+               install root, then removing them deepest-first only if actually empty, cleans
+               that up without ever touching a directory the game itself owns. */
+            var candidateDirectories = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
             foreach (var relativePath in record.InstalledFiles ?? new List<string>())
             {
                 try
                 {
                     var fullPath = Path.Combine(record.InstallPath, relativePath);
                     if (File.Exists(fullPath)) File.Delete(fullPath);
+
+                    var dir = Path.GetDirectoryName(Path.GetFullPath(fullPath));
+                    while (!string.IsNullOrEmpty(dir) &&
+                           !string.Equals(dir.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar), installRoot, StringComparison.OrdinalIgnoreCase) &&
+                           dir.StartsWith(installRoot, StringComparison.OrdinalIgnoreCase))
+                    {
+                        candidateDirectories.Add(dir);
+                        dir = Path.GetDirectoryName(dir);
+                    }
                 }
                 catch (Exception ex)
                 {
                     Log.Warn(ex, $"Failed to delete Luma file '{relativePath}' for '{record.GameName}'.");
                     failures.Add(relativePath);
+                }
+            }
+
+            foreach (var dir in candidateDirectories.OrderByDescending(d => d.Length))
+            {
+                try
+                {
+                    if (Directory.Exists(dir) && Directory.GetFileSystemEntries(dir).Length == 0)
+                        Directory.Delete(dir);
+                }
+                catch (Exception ex)
+                {
+                    Log.Warn(ex, $"Failed to remove now-empty Luma directory '{dir}' for '{record.GameName}'.");
                 }
             }
 

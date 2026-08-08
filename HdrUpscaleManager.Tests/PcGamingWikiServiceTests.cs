@@ -86,5 +86,56 @@ namespace HdrUpscaleManager.Tests
 
             Assert.Null(result);
         }
+
+        [Fact]
+        public void InferConfidentGraphicsApiForReShade_SingleD3D11Version_ReturnsD3D11()
+        {
+            // Hollow Knight's real PCGamingWiki entry, confirmed live 2026-08-08 — a single
+            // unambiguous "11" that InferConfidentGraphicsApi (DXVK-scoped, ≤10 ceiling) wrongly
+            // discards as "not confident" even though there's nothing ambiguous about it.
+            var result = PcGamingWikiService.InferConfidentGraphicsApiForReShade(new List<string> { "11" });
+
+            Assert.Equal(GraphicsApi.D3D11, result);
+        }
+
+        [Fact]
+        public void InferConfidentGraphicsApiForReShade_SingleD3D12Version_ReturnsD3D12()
+        {
+            var result = PcGamingWikiService.InferConfidentGraphicsApiForReShade(new List<string> { "12" });
+
+            Assert.Equal(GraphicsApi.D3D12, result);
+        }
+
+        [Fact]
+        public void InferConfidentGraphicsApiForReShade_MultipleDistinctVersions_ReturnsNull()
+        {
+            // Genuinely ambiguous — a game offering more than one selectable render path with
+            // no installed executable to say which one actually loads.
+            var result = PcGamingWikiService.InferConfidentGraphicsApiForReShade(new List<string> { "9.0c", "11" });
+
+            Assert.Null(result);
+        }
+
+        [Fact]
+        public void InferConfidentGraphicsApiForReShade_SameVersionRepeated_ReturnsThatVersion()
+        {
+            var result = PcGamingWikiService.InferConfidentGraphicsApiForReShade(new List<string> { "11", "11" });
+
+            Assert.Equal(GraphicsApi.D3D11, result);
+        }
+
+        [Fact]
+        public void InferConfidentGraphicsApiForReShade_EmptyList_ReturnsNull()
+        {
+            Assert.Null(PcGamingWikiService.InferConfidentGraphicsApiForReShade(new List<string>()));
+        }
+
+        [Fact]
+        public void InferConfidentGraphicsApiForReShade_UnrecognizedVersionString_ReturnsNull()
+        {
+            var result = PcGamingWikiService.InferConfidentGraphicsApiForReShade(new List<string> { "n/a" });
+
+            Assert.Null(result);
+        }
     }
 }

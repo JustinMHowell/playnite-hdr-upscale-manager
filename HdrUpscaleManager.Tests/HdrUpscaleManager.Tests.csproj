@@ -18,4 +18,10 @@
     <ProjectReference Include="..\HdrUpscaleManager.csproj" />
   </ItemGroup>
 
+  <!-- stopOnFail: true (see xunit.runner.json) — per the user's request, a failing test aborts
+       the whole run instead of continuing through the rest of the suite. -->
+  <ItemGroup>
+    <None Update="xunit.runner.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using FlaUI.Core.AutomationElements;
-using FlaUI.Core.Input;
 using FlaUI.Core.Tools;
 using Newtonsoft.Json;
 using Xunit;
@@ -26,6 +25,15 @@ namespace HdrUpscaleManager.UiTests
        without needing the engine-specific fallback buttons. If your library titles one of
        these differently, edit the literal string in TestGames rather than adding an env var —
        there's no single "override" that makes sense once more than one game is covered.
+
+       Also confirms RenoDX's ReShade dependency: RenoDX ships as a ReShade addon
+       (.addon64/.addon32), which does nothing without ReShade already hosting it in the game
+       folder (AddonInstallService's own doc comment says it drops the file "next to the
+       ReShade DLL"). ManagerViewModel.EnsureReShadeInstalledForRenoDxAsync auto-installs
+       ReShade first when it's missing — this regressed once already (added in 2ffa84d, silently
+       dropped an hour later in bf9f2f4 when the old per-menu-item plugin files were deleted and
+       consolidated into the manager window, confirmed live 2026-08-08), so this test asserts a
+       ReShade proxy DLL actually lands in the game folder, not just the RenoDX addon file.
 
        What this doesn't cover: the wiki/manifest fetches in this codebase are all "try the
        network first, fall back to the on-disk cache only if that throws" (see
@@ -77,59 +85,48 @@ namespace HdrUpscaleManager.UiTests
 
             try
             {
-                var renoDxSection = FindSection(managerWindow, "RenoDX");
-
-                ClickButton(renoDxSection, "Install");
+                ManagerSectionNavigation.ClickSectionButton(managerWindow, "RenoDX", "Install", output);
 
                 var installedPath = WaitForInstall(gameName);
                 Assert.True(File.Exists(installedPath),
                     $"RenoDX install wrote a record but the addon file isn't on disk at '{installedPath}'.");
 
+                var gameInstallDirectory = Path.GetDirectoryName(installedPath);
+                var reShadeProxyDllPath = AssertReShadeInstalled(gameInstallDirectory);
+
                 AssertWikiCacheWasFreshlyFetched(testStartedUtc);
 
-                ClickUninstallUntilRecordGone(renoDxSection, gameName, installedPath);
+                ClickUninstallUntilRecordGone(managerWindow, gameName, installedPath);
+
+                // The addon has no "Uninstall ReShade" action to drive through the UI (its own
+                // status text says installs "always fetch the latest version" — untracked by
+                // design), so deleting is the only way to leave the game folder as it was — but
+                // only for a ReShade install THIS run actually triggered. A pre-existing ReShade
+                // install (confirmed live 2026-08-08 — The Witcher 3 already had one from an
+                // earlier, unrelated session) isn't this test's to remove. Checking
+                // CreationTimeUtc, not LastWriteTimeUtc: ReShadeInstallService.InstallAsync
+                // copies from a cached, previously-extracted DLL via File.Copy, which preserves
+                // the SOURCE file's last-write time (confirmed live 2026-08-08 — a genuinely
+                // fresh install on Hollow Knight still showed a days-old LastWriteTimeUtc
+                // inherited from whenever that cached DLL was first extracted, wrongly reading
+                // as "pre-existing" and leaking a real leftover). File.Copy always stamps a
+                // fresh CreationTimeUtc on the destination, which is what actually answers "did
+                // this run create this file at this path."
+                if (File.GetCreationTimeUtc(reShadeProxyDllPath) >= testStartedUtc.AddSeconds(-2))
+                {
+                    File.Delete(reShadeProxyDllPath);
+                }
             }
             finally
             {
-                managerWindow.Close();
+                // A lingering modal error dialog (e.g. an install failure) disables the owner
+                // window, and FlaUI's Close() throws MethodNotSupportedException against a
+                // disabled window — confirmed live 2026-08-08, and it replaces whatever real
+                // exception the try block was already throwing, hiding the actual failure
+                // reason behind a useless "Close is not supported" instead. Best-effort only:
+                // this is cleanup, not another assertion.
+                try { managerWindow.Close(); } catch (Exception ex) { output.WriteLine($"managerWindow.Close() failed during cleanup: {ex.Message}"); }
             }
-        }
-
-        private AutomationElement FindSection(Window managerWindow, string title)
-        {
-            var heading = Retry.WhileNull(
-                () => managerWindow.FindFirstDescendant(cf => cf.ByName(title)),
-                timeout: TimeSpan.FromSeconds(10)).Result;
-
-            if (heading == null)
-            {
-                Dump("manager window", managerWindow);
-                throw new InvalidOperationException(
-                    $"Couldn't find the '{title}' section heading in the manager window. See " +
-                    "the dumped tree above to fix the selector.");
-            }
-
-            // The title TextBlock's immediate parent StackPanel is the whole section (title,
-            // status, and every button) — see UI/ManagerView.xaml. Scoping button lookups to
-            // this subtree is what avoids matching e.g. Luma's "Install" button instead.
-            return heading.Parent ?? heading;
-        }
-
-        private void ClickButton(AutomationElement section, string buttonName)
-        {
-            var button = Retry.WhileNull(
-                () => section.FindFirstDescendant(cf => cf.ByName(buttonName)),
-                timeout: TimeSpan.FromSeconds(10)).Result;
-
-            if (button == null)
-            {
-                Dump("RenoDX section", section);
-                throw new InvalidOperationException(
-                    $"Couldn't find a '{buttonName}' button in the RenoDX section. See the " +
-                    "dumped tree above to fix the selector.");
-            }
-
-            Mouse.Click(button.GetClickablePoint(), MouseButton.Left);
         }
 
         private string WaitForInstall(string gameName)
@@ -164,14 +161,14 @@ namespace HdrUpscaleManager.UiTests
            silent no-op, not a real failure. Retrying the click a few times (each one is itself
            an input event that can trigger the re-query) resolves that race without needing to
            understand WPF's exact internal timing. */
-        private void ClickUninstallUntilRecordGone(AutomationElement renoDxSection, string gameName, string installedPath)
+        private void ClickUninstallUntilRecordGone(Window managerWindow, string gameName, string installedPath)
         {
             const int maxAttempts = 5;
             var recordGone = false;
 
             for (var attempt = 1; attempt <= maxAttempts && !recordGone; attempt++)
             {
-                ClickButton(renoDxSection, "Uninstall");
+                ManagerSectionNavigation.ClickSectionButton(managerWindow, "RenoDX", "Uninstall", output);
                 recordGone = Retry.WhileFalse(
                     () => FindRecordByGameName(gameName) == null,
                     timeout: TimeSpan.FromSeconds(3),
@@ -190,6 +187,35 @@ namespace HdrUpscaleManager.UiTests
             Assert.True(fileGone,
                 $"Uninstall removed the tracked record but left the addon file behind at '{installedPath}' " +
                 "— this game's install folder is no longer back to its pre-test state.");
+        }
+
+        /* ReShade's installer DLL gets renamed to whichever of these matches the game's
+           detected graphics API (see Services/ReShade/ReShadeProxyDll.cs) — duplicated here
+           rather than referenced, same as PluginPaths.PluginId, since this project deliberately
+           has no reference back to the addon (see README.md). Deliberately NOT asserting this
+           was freshly written: a game can legitimately already have ReShade installed from
+           outside this test entirely (confirmed live 2026-08-08 — The Witcher 3 already had one
+           from 2026-08-02), and EnsureReShadeInstalledForRenoDxAsync correctly leaves an
+           existing install alone rather than reinstalling over it. The caller decides whether
+           to clean it up based on whether THIS run actually wrote it. */
+        private static readonly string[] ReShadeProxyDllCandidates = { "d3d9.dll", "dxgi.dll", "opengl32.dll" };
+
+        private string AssertReShadeInstalled(string gameInstallDirectory)
+        {
+            var found = ReShadeProxyDllCandidates
+                .Select(name => Path.Combine(gameInstallDirectory, name))
+                .FirstOrDefault(File.Exists);
+
+            if (found == null)
+            {
+                throw new InvalidOperationException(
+                    $"RenoDX needs ReShade installed as a host, but none of " +
+                    $"{string.Join(", ", ReShadeProxyDllCandidates)} exist in '{gameInstallDirectory}' " +
+                    "after installing RenoDX — EnsureReShadeInstalledForRenoDxAsync didn't run, its " +
+                    "auto-install failed silently, or ReShade genuinely isn't present for this game.");
+            }
+
+            return found;
         }
 
         /* Every wiki/manifest fetch in this codebase tries the network first and only reads
@@ -228,12 +254,6 @@ namespace HdrUpscaleManager.UiTests
                 // let the caller's Retry loop try again rather than fail the test on a fluke.
                 return null;
             }
-        }
-
-        private void Dump(string label, AutomationElement root)
-        {
-            output.WriteLine($"--- automation tree dump: {label} ---");
-            output.WriteLine(AutomationTreeDumper.Dump(root));
         }
 
         private class RenoDxRecordDto

@@ -4,6 +4,7 @@
              xmlns:local="clr-namespace:HdrUpscaleManager.UI">
     <UserControl.Resources>
         <local:StringNotEmptyToVisibilityConverter x:Key="StringNotEmptyToVis"/>
+        <BooleanToVisibilityConverter x:Key="BoolToVis"/>
 
         <Style x:Key="SectionBorder" TargetType="Border">
             <Setter Property="BorderThickness" Value="1"/>
@@ -64,9 +65,12 @@
                         </StackPanel>
                         <TextBlock Text="{Binding RenoDxEngineDetectionText}" Style="{StaticResource SectionStatus}" Margin="0,8,0,4"/>
                         <StackPanel Orientation="Horizontal">
-                            <Button Content="Unreal Engine, generic" Command="{Binding RenoDxInstallUnrealGenericCommand}" IsEnabled="{Binding CanInstallUnrealRenoDx}"/>
-                            <Button Content="Unreal Engine, UE-Extended" Command="{Binding RenoDxInstallUnrealUeExtendedCommand}" IsEnabled="{Binding CanInstallUnrealRenoDx}"/>
-                            <Button Content="Unity, generic" Command="{Binding RenoDxInstallUnityCommand}" IsEnabled="{Binding CanInstallUnityRenoDx}"/>
+                            <Button Content="Unreal Engine, generic" Command="{Binding RenoDxInstallUnrealGenericCommand}"
+                                    IsEnabled="{Binding CanInstallUnrealRenoDx}" Visibility="{Binding CanInstallUnrealRenoDx, Converter={StaticResource BoolToVis}}"/>
+                            <Button Content="Unreal Engine, UE-Extended" Command="{Binding RenoDxInstallUnrealUeExtendedCommand}"
+                                    IsEnabled="{Binding CanInstallUnrealRenoDx}" Visibility="{Binding CanInstallUnrealRenoDx, Converter={StaticResource BoolToVis}}"/>
+                            <Button Content="Unity, generic" Command="{Binding RenoDxInstallUnityCommand}"
+                                    IsEnabled="{Binding CanInstallUnityRenoDx}" Visibility="{Binding CanInstallUnityRenoDx, Converter={StaticResource BoolToVis}}"/>
                         </StackPanel>
                     </StackPanel>
                 </Border>
@@ -89,7 +93,8 @@
                         <TextBlock Text="{Binding DxvkStatus}" Style="{StaticResource SectionStatus}"/>
                         <TextBlock Text="{Binding DxvkApiDetectionText}" Style="{StaticResource SectionStatus}"/>
                         <StackPanel Orientation="Horizontal">
-                            <Button Content="Install (DX8/DX9/DX10)" Command="{Binding DxvkInstallCommand}" IsEnabled="{Binding CanInstallDxvk}"/>
+                            <Button Content="Install (DX8/DX9/DX10)" Command="{Binding DxvkInstallCommand}"
+                                    IsEnabled="{Binding CanInstallDxvk}" Visibility="{Binding ShowDxvkInstallButton, Converter={StaticResource BoolToVis}}"/>
                             <Button Content="Check update" Command="{Binding DxvkUpdateCommand}"/>
                             <Button Content="Uninstall" Command="{Binding DxvkUninstallCommand}"/>
                         </StackPanel>

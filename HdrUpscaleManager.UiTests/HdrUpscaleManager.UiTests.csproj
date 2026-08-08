@@ -25,4 +25,13 @@
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
   </ItemGroup>
 
+  <!-- stopOnFail: true (see xunit.runner.json) — a failing test aborts the whole run instead of
+       continuing to launch/kill Playnite through the rest of the suite. Especially valuable
+       here: these tests are slow (each relaunches Playnite) and mutate real state (installs,
+       game folders) — stopping immediately means less time spent, and less state to clean up,
+       once something's already known to be broken. -->
+  <ItemGroup>
+    <None Update="xunit.runner.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

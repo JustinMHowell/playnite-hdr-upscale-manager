@@ -1,7 +1,7 @@
 # HDR & Upscale Manager — local UI automation tests
 
 FlaUI-driven smoke and integration tests that drive a **real Playnite** instance. There are
-four test classes:
+five test classes:
 
 | Class | What it checks |
 |---|---|
@@ -9,19 +9,21 @@ four test classes:
 | `ManifestSyncUiTests` | Clicking "Check manifest sync" in the main menu re-fetches `manifest.json` on disk. |
 | `ManifestAutoDownloadUiTests` | A **fresh Playnite launch with no local `manifest.json`** re-downloads it automatically via `OnApplicationStarted`, with no click involved. The counterpart to `ManifestSyncUiTests` — see that class's own doc comment for why the two don't share a fixture. |
 | `RenoDxInstallUiTests` | A real RenoDX install/uninstall round trip through the manager window's actual buttons: the addon file lands in the game folder, the on-disk install record matches it, and uninstalling removes both, leaving the game folder exactly as it was. A `[Theory]` with one `[InlineData]` case per game (currently The Witcher 3 and Hollow Knight — see `GAMES-TO-TEST.md` for why those two). |
+| `LumaInstallUiTests` | Same round trip as `RenoDxInstallUiTests`, but for Luma — which can deploy several files from a zip rather than one `.addon64`, so cleanup verifies every installed file is gone, not just one. A `[Theory]` covering Vanquish and INSIDE. |
 
-All four run against a real Playnite process, so they're serialized into one xUnit collection
+All five run against a real Playnite process, so they're serialized into one xUnit collection
 (`PlayniteUiCollection`, `DisableParallelization = true`) — otherwise xUnit's default of running
 different test classes in parallel would have two of them fighting to kill/launch the same
 process at once. Run the whole project or a single class; either way they execute one at a time.
 
-`RenoDxInstallUiTests` actually downloads a real file into the target game's install folder and
-writes to your real Playnite plugin data under `%AppData%\Playnite\ExtensionsData\...` — it isn't
-a pure UI smoke test like the others. It refuses to run if that game already has a tracked RenoDX
-install going in, so it won't touch a real install you made outside of this test suite.
+`RenoDxInstallUiTests`/`LumaInstallUiTests` actually download a real file into the target game's
+install folder and write to your real Playnite plugin data under
+`%AppData%\Playnite\ExtensionsData\...` — they aren't pure UI smoke tests like the others. Each
+refuses to run if that game already has a tracked install going in, so neither will touch a real
+install you made outside of this test suite.
 
-Every game-specific test (`ManagerWindowUiTests`, `RenoDxInstallUiTests`) reaches its target game
-through `ManagerWindowNavigation.Open`, which drives Playnite's own global search
+Every game-specific test (`ManagerWindowUiTests`, `RenoDxInstallUiTests`, `LumaInstallUiTests`)
+reaches its target game through `ManagerWindowNavigation.Open`, which drives Playnite's own global search
 (`playnite://playnite/search/<term>`, then Enter, then the sidebar's "More" button) rather than
 right-clicking the game directly in the library grid. That grid can be UI-virtualized on a large
 library — a game that isn't scrolled into view may not even have an automation element to find.
@@ -84,11 +86,12 @@ and adjust the one selector that broke.
 
 - `ManagerWindowUiTests` doesn't install anything, click any install/uninstall button, or touch
   your actual game files — it only opens the window and checks the section labels are present,
-  then closes it. `RenoDxInstallUiTests` is the exception — see the table above.
+  then closes it. `RenoDxInstallUiTests`/`LumaInstallUiTests` are the exception — see the table above.
 - None of these run in CI. They require a real desktop session, a real Playnite install, and
   (for the game-specific ones) your own library — none of which exist on a CI runner.
-- `RenoDxInstallUiTests` doesn't simulate a network outage to exercise the wiki-cache fallback
-  path (`RenoDxWikiService.FetchAllAsync` falls back to its on-disk cache only when the live
-  fetch throws) — it only confirms a successful install fetches fresh data rather than reusing a
-  stale cache file. Actually forcing that fallback branch would mean blocking this machine's real
-  network access, which is out of scope for an automated test here.
+- `RenoDxInstallUiTests`/`LumaInstallUiTests` don't simulate a network outage to exercise the
+  wiki-cache fallback path (`RenoDxWikiService`/`LumaWikiService`'s `FetchAllAsync` falls back to
+  its on-disk cache only when the live fetch throws) — they only confirm a successful install
+  fetches fresh data rather than reusing a stale cache file. Actually forcing that fallback
+  branch would mean blocking this machine's real network access, which is out of scope for an
+  automated test here.

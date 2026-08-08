@@ -18,6 +18,7 @@
     -->
     <UserControl.Resources>
         <local:StringNotEmptyToVisibilityConverter x:Key="StringNotEmptyToVis"/>
+        <BooleanToVisibilityConverter x:Key="BoolToVis"/>
 
         <Style x:Key="FsButton" TargetType="Button">
             <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
@@ -126,9 +127,12 @@
                     </StackPanel>
                     <TextBlock Text="{Binding RenoDxEngineDetectionText}" Style="{StaticResource FsSectionStatus}" Margin="0,0,0,4"/>
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,20">
-                        <Button Content="Unreal Engine, generic" Style="{StaticResource FsButton}" Command="{Binding RenoDxInstallUnrealGenericCommand}" IsEnabled="{Binding CanInstallUnrealRenoDx}"/>
-                        <Button Content="Unreal Engine, UE-Extended" Style="{StaticResource FsButton}" Command="{Binding RenoDxInstallUnrealUeExtendedCommand}" IsEnabled="{Binding CanInstallUnrealRenoDx}"/>
-                        <Button Content="Unity, generic" Style="{StaticResource FsButton}" Command="{Binding RenoDxInstallUnityCommand}" IsEnabled="{Binding CanInstallUnityRenoDx}"/>
+                        <Button Content="Unreal Engine, generic" Style="{StaticResource FsButton}" Command="{Binding RenoDxInstallUnrealGenericCommand}"
+                                IsEnabled="{Binding CanInstallUnrealRenoDx}" Visibility="{Binding CanInstallUnrealRenoDx, Converter={StaticResource BoolToVis}}"/>
+                        <Button Content="Unreal Engine, UE-Extended" Style="{StaticResource FsButton}" Command="{Binding RenoDxInstallUnrealUeExtendedCommand}"
+                                IsEnabled="{Binding CanInstallUnrealRenoDx}" Visibility="{Binding CanInstallUnrealRenoDx, Converter={StaticResource BoolToVis}}"/>
+                        <Button Content="Unity, generic" Style="{StaticResource FsButton}" Command="{Binding RenoDxInstallUnityCommand}"
+                                IsEnabled="{Binding CanInstallUnityRenoDx}" Visibility="{Binding CanInstallUnityRenoDx, Converter={StaticResource BoolToVis}}"/>
                     </StackPanel>
 
                     <TextBlock Text="Luma" Style="{StaticResource FsSectionTitle}"/>
@@ -143,7 +147,8 @@
                     <TextBlock Text="{Binding DxvkStatus}" Style="{StaticResource FsSectionStatus}"/>
                     <TextBlock Text="{Binding DxvkApiDetectionText}" Style="{StaticResource FsSectionStatus}"/>
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,20">
-                        <Button Content="Install (DX8/DX9/DX10)" Style="{StaticResource FsButton}" Command="{Binding DxvkInstallCommand}" IsEnabled="{Binding CanInstallDxvk}"/>
+                        <Button Content="Install (DX8/DX9/DX10)" Style="{StaticResource FsButton}" Command="{Binding DxvkInstallCommand}"
+                                IsEnabled="{Binding CanInstallDxvk}" Visibility="{Binding ShowDxvkInstallButton, Converter={StaticResource BoolToVis}}"/>
                         <Button Content="Check update" Style="{StaticResource FsButton}" Command="{Binding DxvkUpdateCommand}"/>
                         <Button Content="Uninstall" Style="{StaticResource FsButton}" Command="{Binding DxvkUninstallCommand}"/>
                     </StackPanel>

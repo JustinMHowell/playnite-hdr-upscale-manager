@@ -35,20 +35,33 @@ namespace HdrUpscaleManager.Services.ReShade
            an HDR feature). Just checks whether the proxy DLL a ReShade install would use is
            already sitting in the game folder — doesn't verify it's actually ReShade specifically
            (vs. DXVK's own same-named DLL, or the game's real one), same ambiguity InstallAsync
-           itself already lives with via its BackupIfNeeded rename-not-overwrite step. */
-        public static bool IsInstalled(string gameInstallPath)
+           itself already lives with via its BackupIfNeeded rename-not-overwrite step.
+
+           apiOverride (from RemoteManifest.GraphicsApiOverrides) skips PE import-table
+           inspection for the API itself when the caller already knows it — see InstallAsync's
+           own doc comment for why that inspection can't be trusted alone. */
+        public static bool IsInstalled(string gameInstallPath, GraphicsApi? apiOverride = null)
         {
             var exePath = PeInspector.FindGameExecutable(gameInstallPath);
             if (exePath == null) return false;
 
-            var info = PeInspector.Inspect(exePath);
-            var proxyDllName = info != null ? ReShadeProxyDll.GetProxyDllName(info.Api) : null;
+            var api = apiOverride ?? PeInspector.Inspect(exePath)?.Api;
+            var proxyDllName = api != null ? ReShadeProxyDll.GetProxyDllName(api.Value) : null;
             return proxyDllName != null && File.Exists(Path.Combine(gameInstallPath, proxyDllName));
         }
 
         /* Always installs whatever version reshade.me currently serves — there's no version
-           picker yet, this will become configurable later. */
-        public async Task<ReShadeInstallResult> InstallAsync(string gameInstallPath)
+           picker yet, this will become configurable later.
+
+           apiOverride lets a caller supply a manifest-curated GraphicsApi (RemoteManifest.
+           GraphicsApiOverrides) instead of trusting PE import-table inspection alone — confirmed
+           live 2026-08-08 that the hand-rolled import walk can read a real game's PE header fine
+           (bitness came back correct) while still failing to recognize any graphics DLL import
+           at all, for reasons not fully understood (likely a bound-import/delay-load layout this
+           simple walk doesn't follow) — The Witcher 3's own bin\x64_dx12\witcher3.exe is a
+           confirmed real-world case. Bitness still always comes from the real PE header below,
+           since that part has never been observed to fail. */
+        public async Task<ReShadeInstallResult> InstallAsync(string gameInstallPath, GraphicsApi? apiOverride = null)
         {
             var exePath = PeInspector.FindGameExecutable(gameInstallPath);
             if (exePath == null)
@@ -58,9 +71,10 @@ namespace HdrUpscaleManager.Services.ReShade
             if (info == null)
                 return Fail("Could not read the game executable's PE header.");
 
-            var proxyDllName = ReShadeProxyDll.GetProxyDllName(info.Api);
+            var api = apiOverride ?? info.Api;
+            var proxyDllName = ReShadeProxyDll.GetProxyDllName(api);
             if (proxyDllName == null)
-                return Fail($"{info.Api} isn't supported by a drop-in ReShade install.");
+                return Fail($"{api} isn't supported by a drop-in ReShade install.");
 
             var versionInfo = await ReShadeVersionChecker.CheckLatestAsync().ConfigureAwait(false);
             if (versionInfo == null)
@@ -102,12 +116,12 @@ namespace HdrUpscaleManager.Services.ReShade
                 return Fail($"Failed to copy ReShade into the game folder: {ex.Message}");
             }
 
-            Log.Info($"Installed ReShade {versionInfo.Version} ({info.Api}, {(info.Is64Bit ? "64-bit" : "32-bit")}) to '{targetPath}'.");
+            Log.Info($"Installed ReShade {versionInfo.Version} ({api}, {(info.Is64Bit ? "64-bit" : "32-bit")}) to '{targetPath}'.");
             return new ReShadeInstallResult
             {
                 Success = true,
                 InstalledDllPath = targetPath,
-                Api = info.Api,
+                Api = api,
                 Version = versionInfo.Version
             };
         }

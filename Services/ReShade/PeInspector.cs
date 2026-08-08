@@ -43,16 +43,70 @@ namespace HdrUpscaleManager.Services.ReShade
             [GraphicsApi.Unknown] = 0,
         };
 
-        /* Largest .exe in the top-level install folder — a plain heuristic, but the same one
-           RHI itself uses, and DRM/launcher stub executables are reliably smaller than the real game. */
+        private static readonly Dictionary<string, GraphicsApi> ApiOverrideTokens =
+            new Dictionary<string, GraphicsApi>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["DX8"] = GraphicsApi.D3D8,
+                ["DX9"] = GraphicsApi.D3D9,
+                ["DX10"] = GraphicsApi.D3D10,
+                ["DX11"] = GraphicsApi.D3D11,
+                ["DX12"] = GraphicsApi.D3D12,
+                ["OGL"] = GraphicsApi.OpenGl,
+                ["VLK"] = GraphicsApi.Vulkan,
+            };
+
+        /* Manifest override values are RHI's own short tokens, sometimes several comma-
+           separated for games that support more than one API (e.g. "DX11, DX12"). Picks
+           whichever parses to the highest-priority GraphicsApi via the same ranking real PE
+           inspection uses to break ties — for "DX12, VLK" that's D3D12, which also happens to
+           be the one with an actual drop-in ReShade proxy, unlike Vulkan. */
+        public static GraphicsApi? ParseApiOverride(string raw)
+        {
+            if (string.IsNullOrWhiteSpace(raw)) return null;
+
+            GraphicsApi? best = null;
+            var bestPriority = -1;
+            foreach (var token in raw.Split(','))
+            {
+                if (!ApiOverrideTokens.TryGetValue(token.Trim(), out var api)) continue;
+                if (Priority[api] > bestPriority)
+                {
+                    bestPriority = Priority[api];
+                    best = api;
+                }
+            }
+
+            return best;
+        }
+
+        /* Largest .exe under the install folder — the same plain heuristic RHI itself uses,
+           widened from the top-level folder to every subfolder: confirmed live 2026-08-08 that
+           it fails on games whose real engine binary lives in a subfolder while a small
+           launcher/bootstrap stub sits at the root (The Witcher 3 — bin\x64\witcher3.exe is
+           85MB, but the only top-level .exe is REDprelauncher.exe at 1.8MB; scanning
+           TopDirectoryOnly picked the stub and its PE imports never mention a graphics DLL at
+           all, misreporting the whole game as GraphicsApi.Unknown). DRM/launcher stubs are
+           still reliably smaller than the real game once every subfolder is in play — the
+           exclusions below only guard against installer/uninstaller/crash-handler executables
+           that could otherwise rival or beat an indie game's exe in size despite never being
+           "the game" under any definition. */
+        private static readonly string[] ExcludedExecutableNameFragments =
+        {
+            "unins", "redist", "setup", "prereq", "vc_redist", "dxsetup", "crashreport", "crashhandler",
+        };
+
         public static string FindGameExecutable(string installPath)
         {
             var dir = new DirectoryInfo(installPath);
             if (!dir.Exists) return null;
 
             FileInfo largest = null;
-            foreach (var file in dir.GetFiles("*.exe", SearchOption.TopDirectoryOnly))
+            foreach (var file in dir.GetFiles("*.exe", SearchOption.AllDirectories))
             {
+                var nameLower = file.Name.ToLowerInvariant();
+                if (Array.Exists(ExcludedExecutableNameFragments, fragment => nameLower.Contains(fragment)))
+                    continue;
+
                 if (largest == null || file.Length > largest.Length)
                     largest = file;
             }

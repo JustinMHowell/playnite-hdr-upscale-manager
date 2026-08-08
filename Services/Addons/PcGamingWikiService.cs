@@ -22,6 +22,11 @@ namespace HdrUpscaleManager.Services.Addons
            shipped an 11/12 path is left null: on an uninstalled game there's no way to tell which
            path its executable actually loads, and a false "yes" would be worse than no answer. */
         public GraphicsApi? ConfidentGraphicsApi { get; set; }
+
+        /* Broader counterpart to ConfidentGraphicsApi for ReShade/RenoDX rather than DXVK —
+           ReShade supports the full D3D8-D3D12 range (plus OpenGL), so unlike DXVK there's no
+           version ceiling to reject above. See InferConfidentGraphicsApiForReShade. */
+        public GraphicsApi? ConfidentGraphicsApiForReShade { get; set; }
     }
 
     /* Fallback engine/graphics-API lookup via PCGamingWiki's public Cargo query API, used only
@@ -61,6 +66,7 @@ namespace HdrUpscaleManager.Services.Addons
                     result.PageTitle = pageTitle;
                     result.Direct3DVersionsRaw = await QueryDirect3DVersionsAsync(pageTitle).ConfigureAwait(false);
                     result.ConfidentGraphicsApi = InferConfidentGraphicsApi(result.Direct3DVersionsRaw);
+                    result.ConfidentGraphicsApiForReShade = InferConfidentGraphicsApiForReShade(result.Direct3DVersionsRaw);
 
                     result.EngineRaw = CleanEngineName(await QueryEnginesAsync(pageTitle).ConfigureAwait(false));
                     result.MappedEngine = MapEngine(result.EngineRaw);
@@ -156,6 +162,42 @@ namespace HdrUpscaleManager.Services.Addons
 
         private static GraphicsApi Max(GraphicsApi? current, GraphicsApi candidate) =>
             current == null || candidate > current.Value ? candidate : current.Value;
+
+        /* Unlike InferConfidentGraphicsApi, ReShade supports the full D3D8-D3D12 range, so
+           there's no version ceiling to reject above — confirmed live 2026-08-08 against Hollow
+           Knight, whose PCGamingWiki page lists exactly one value ("11"), which
+           InferConfidentGraphicsApi discarded as "not confident" purely because of DXVK's ≤10
+           ceiling, even though a single listed value is unambiguous no matter what number it
+           is. Only genuinely ambiguous when more than one DISTINCT version is listed (a game
+           with multiple selectable render paths) — that still returns null, same caution as
+           InferConfidentGraphicsApi, just not triggered by D3D11/12 alone anymore. */
+        public static GraphicsApi? InferConfidentGraphicsApiForReShade(List<string> versions)
+        {
+            if (versions == null || versions.Count == 0) return null;
+
+            GraphicsApi? result = null;
+            foreach (var version in versions)
+            {
+                var match = LeadingVersionNumber.Match(version);
+                if (!match.Success) return null;
+
+                GraphicsApi api;
+                switch (match.Groups[1].Value)
+                {
+                    case "8": api = GraphicsApi.D3D8; break;
+                    case "9": api = GraphicsApi.D3D9; break;
+                    case "10": api = GraphicsApi.D3D10; break;
+                    case "11": api = GraphicsApi.D3D11; break;
+                    case "12": api = GraphicsApi.D3D12; break;
+                    default: return null;
+                }
+
+                if (result != null && result != api) return null;
+                result = api;
+            }
+
+            return result;
+        }
 
         private static string EscapeCargoValue(string value) => value.Replace("\"", "\\\"");
 

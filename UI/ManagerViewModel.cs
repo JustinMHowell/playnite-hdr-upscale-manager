@@ -34,8 +34,15 @@ namespace HdrUpscaleManager.UI
            these fields update in place once it returns (see RefreshDetectionFromPcGamingWikiAsync). */
         private RenoDxEngine? detectedRenoDxEngine;
         private GraphicsApi detectedDxvkApi;
+        /* Same underlying detection as detectedDxvkApi, but for ReShade/RenoDX rather than
+           DXVK — kept separate because DXVK's PCGamingWiki confidence check deliberately
+           rejects D3D11/12 answers (DXVK only supports up to D3D10), which would wrongly read
+           as "unknown" for ReShade, which supports the full D3D8-D3D12 range. See
+           KnownGraphicsApiOrNull and PcGamingWikiService.InferConfidentGraphicsApiForReShade. */
+        private GraphicsApi reShadeGraphicsApi;
         private string pcgwEngineRaw;
         private bool pcgwLookupInProgress;
+        private Task pcgwLookupTask;
 
         public Game Game { get; }
         public string GameName => Game.Name;
@@ -53,6 +60,12 @@ namespace HdrUpscaleManager.UI
         };
 
         public bool CanInstallDxvk => DxvkSupportedApis.Contains(detectedDxvkApi);
+        /* CanInstallDxvk can't drive the button's Visibility directly: it's false both when
+           the API is confidently unsupported AND when it's simply not known yet, but only the
+           first case should actually hide the button — an Unknown API might still resolve via
+           the PCGamingWiki fallback, and hiding the button on every "not detected yet" instant
+           would flicker it in and out as detection completes. */
+        public bool ShowDxvkInstallButton => detectedDxvkApi == GraphicsApi.Unknown || CanInstallDxvk;
         public string DxvkApiDetectionText => detectedDxvkApi switch
         {
             GraphicsApi.D3D8 => "Detected graphics API: DirectX 8.",
@@ -144,8 +157,25 @@ namespace HdrUpscaleManager.UI
             detectedRenoDxEngine = RenoDxEngineDetector.Detect(
                 Game.InstallDirectory, GameName, cachedManifest?.InstallPathOverrides, cachedManifest?.EngineHintOverrides).Engine;
 
-            var exePath = PeInspector.FindGameExecutable(Game.InstallDirectory);
-            detectedDxvkApi = exePath != null ? (PeInspector.Inspect(exePath)?.Api ?? GraphicsApi.Unknown) : GraphicsApi.Unknown;
+            string graphicsApiOverrideRaw = null;
+            cachedManifest?.GraphicsApiOverrides?.TryGetValue(GameName, out graphicsApiOverrideRaw);
+            var graphicsApiOverride = PeInspector.ParseApiOverride(graphicsApiOverrideRaw);
+
+            if (graphicsApiOverride != null)
+            {
+                detectedDxvkApi = graphicsApiOverride.Value;
+            }
+            else
+            {
+                var exePath = PeInspector.FindGameExecutable(Game.InstallDirectory);
+                detectedDxvkApi = exePath != null ? (PeInspector.Inspect(exePath)?.Api ?? GraphicsApi.Unknown) : GraphicsApi.Unknown;
+            }
+
+            /* Starts equal to detectedDxvkApi — manifest override and PE inspection have no
+               DXVK-specific ceiling, so both are equally valid for ReShade at this point. Only
+               diverges once RefreshDetectionFromPcGamingWikiAsync applies each field's own
+               correctly-scoped confidence function to the same underlying lookup. */
+            reShadeGraphicsApi = detectedDxvkApi;
 
             ReShadeInstallCommand = new RelayCommand(() => Run(InstallReShadeAsync), () => !IsBusy);
 
@@ -181,7 +211,7 @@ namespace HdrUpscaleManager.UI
             if (detectedRenoDxEngine == null || detectedDxvkApi == GraphicsApi.Unknown)
             {
                 pcgwLookupInProgress = true;
-                _ = RefreshDetectionFromPcGamingWikiAsync();
+                pcgwLookupTask = RefreshDetectionFromPcGamingWikiAsync();
             }
         }
 
@@ -204,6 +234,9 @@ namespace HdrUpscaleManager.UI
 
                 if (detectedDxvkApi == GraphicsApi.Unknown && lookup.ConfidentGraphicsApi != null)
                     detectedDxvkApi = lookup.ConfidentGraphicsApi.Value;
+
+                if (reShadeGraphicsApi == GraphicsApi.Unknown && lookup.ConfidentGraphicsApiForReShade != null)
+                    reShadeGraphicsApi = lookup.ConfidentGraphicsApiForReShade.Value;
             }
             catch (Exception ex)
             {
@@ -217,6 +250,7 @@ namespace HdrUpscaleManager.UI
                 OnPropertyChanged(nameof(CanInstallUnityRenoDx));
                 OnPropertyChanged(nameof(DxvkApiDetectionText));
                 OnPropertyChanged(nameof(CanInstallDxvk));
+                OnPropertyChanged(nameof(ShowDxvkInstallButton));
                 CommandManager.InvalidateRequerySuggested();
             }
         }
@@ -279,13 +313,35 @@ namespace HdrUpscaleManager.UI
 
         // ── ReShade ──────────────────────────────────────────────────────────────
 
+        /* GraphicsApi.Unknown means "no known API," not a real value to force — treating it as
+           an override would skip ReShadeInstallService's own PE-inspection fallback for no
+           reason. detectedDxvkApi already folds in the manifest's GraphicsApiOverrides (see the
+           constructor) ahead of PE inspection, so reusing it here covers ReShade the same way
+           without a second, separate lookup. */
+        private GraphicsApi? KnownGraphicsApiOrNull => reShadeGraphicsApi == GraphicsApi.Unknown ? (GraphicsApi?)null : reShadeGraphicsApi;
+
+        /* The constructor kicks off RefreshDetectionFromPcGamingWikiAsync fire-and-forget when
+           local detection (manifest override, then PE inspection) came back inconclusive — fine
+           for the window just rendering "checking…" text, but a RenoDX install triggered right
+           after the window opens can easily race ahead of that lookup finishing (confirmed live
+           2026-08-08 against Hollow Knight — a Unity game, whose player binary loads its
+           graphics DLL dynamically at runtime rather than importing it statically, so PE
+           inspection can never see it no matter how correct the parser is; only the PCGamingWiki
+           tier can resolve it). Awaiting the same in-flight task here — not starting a second,
+           redundant lookup — means RenoDX's ReShade-first check always sees the best answer
+           this addon is capable of producing, not whatever was known at construction time. */
+        private async Task EnsurePcGamingWikiLookupCompletedAsync()
+        {
+            if (pcgwLookupTask != null) await pcgwLookupTask.ConfigureAwait(true);
+        }
+
         private async Task InstallReShadeAsync()
         {
             StatusText = "Installing ReShade…";
             try
             {
                 var cacheDir = Path.Combine(userDataPath, "ReShadeCache");
-                var result = await new ReShadeInstallService(cacheDir).InstallAsync(Game.InstallDirectory).ConfigureAwait(true);
+                var result = await new ReShadeInstallService(cacheDir).InstallAsync(Game.InstallDirectory, KnownGraphicsApiOrNull).ConfigureAwait(true);
                 if (!result.Success)
                 {
                     Log.Error($"ReShade install failed for '{GameName}': {result.Error}");
@@ -303,6 +359,43 @@ namespace HdrUpscaleManager.UI
             }
         }
 
+        /* RenoDX ships as a ReShade addon (.addon64/.addon32) — AddonInstallService drops it
+           "next to the ReShade DLL" and relies on ReShade to actually load it, so a RenoDX
+           install does nothing if ReShade isn't already present. Installs ReShade first when
+           missing, silent on success (just logged) so a single "Install" click doesn't pop two
+           dialogs; surfaces an error and aborts the RenoDX install if this step fails. Luma
+           isn't gated the same way — every Luma mod inspected so far (see PLAN.md's backlog)
+           ships its own self-hosted dxgi.dll/.addon rather than depending on an existing
+           ReShade install. */
+        private async Task<bool> EnsureReShadeInstalledForRenoDxAsync()
+        {
+            if (KnownGraphicsApiOrNull == null) await EnsurePcGamingWikiLookupCompletedAsync().ConfigureAwait(true);
+
+            if (ReShadeInstallService.IsInstalled(Game.InstallDirectory, KnownGraphicsApiOrNull)) return true;
+
+            try
+            {
+                var cacheDir = Path.Combine(userDataPath, "ReShadeCache");
+                var result = await new ReShadeInstallService(cacheDir).InstallAsync(Game.InstallDirectory, KnownGraphicsApiOrNull).ConfigureAwait(true);
+                if (!result.Success)
+                {
+                    StatusText = $"RenoDX needs ReShade installed first, and that failed: {result.Error}";
+                    api.Dialogs.ShowErrorMessage(StatusText, "Install RenoDX");
+                    return false;
+                }
+
+                Log.Info($"Auto-installed ReShade {result.Version} ({result.Api}) for '{GameName}' ahead of RenoDX.");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, $"Auto ReShade install failed for '{GameName}' ahead of RenoDX.");
+                StatusText = $"RenoDX needs ReShade installed first, and that failed: {ex.Message}";
+                api.Dialogs.ShowErrorMessage(StatusText, "Install RenoDX");
+                return false;
+            }
+        }
+
         // ── RenoDX ───────────────────────────────────────────────────────────────
 
         /* Best-effort single button: try the wiki-matched build first, and if there's simply no
@@ -316,6 +409,8 @@ namespace HdrUpscaleManager.UI
             RenoDxExternalUrl = null;
             try
             {
+                if (!await EnsureReShadeInstalledForRenoDxAsync().ConfigureAwait(true)) return;
+
                 var manifestResult = await new ManifestService(userDataPath).FetchAsync().ConfigureAwait(true);
                 var manifest = manifestResult?.Manifest;
                 var wikiCacheDir = Path.Combine(userDataPath, "RenoDxWikiCache");
@@ -388,6 +483,8 @@ namespace HdrUpscaleManager.UI
             StatusText = $"Installing RenoDX ({engineLabel})…";
             try
             {
+                if (!await EnsureReShadeInstalledForRenoDxAsync().ConfigureAwait(true)) return;
+
                 RemoteManifest manifest = null;
                 if (engine == RenoDxEngine.UnrealEngine)
                     manifest = (await new ManifestService(userDataPath).FetchAsync().ConfigureAwait(true))?.Manifest;
