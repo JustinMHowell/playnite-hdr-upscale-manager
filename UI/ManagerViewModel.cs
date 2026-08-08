@@ -27,10 +27,15 @@ namespace HdrUpscaleManager.UI
         private readonly IPlayniteAPI api;
         private readonly string userDataPath;
 
-        /* Detected once at window-open time (install folder doesn't change while the window is
-           open) — drives the RenoDX per-engine and DXVK IsEnabled bindings below. */
-        private readonly RenoDxEngine? detectedRenoDxEngine;
-        private readonly GraphicsApi detectedDxvkApi;
+        /* Detected at window-open time (install folder doesn't change while the window is open)
+           — drives the RenoDX per-engine and DXVK IsEnabled bindings below. Local filesystem/PE
+           detection runs synchronously first (instant); if it can't tell — usually because the
+           game isn't installed yet — a PCGamingWiki lookup fills the gap in the background, and
+           these fields update in place once it returns (see RefreshDetectionFromPcGamingWikiAsync). */
+        private RenoDxEngine? detectedRenoDxEngine;
+        private GraphicsApi detectedDxvkApi;
+        private string pcgwEngineRaw;
+        private bool pcgwLookupInProgress;
 
         public Game Game { get; }
         public string GameName => Game.Name;
@@ -41,7 +46,10 @@ namespace HdrUpscaleManager.UI
         {
             RenoDxEngine.UnrealEngine => "Detected engine: Unreal Engine.",
             RenoDxEngine.UnityEngine => "Detected engine: Unity.",
-            _ => "Engine not auto-detected — Unreal and Unity options both available."
+            _ when pcgwLookupInProgress => "Engine not auto-detected locally — checking PCGamingWiki…",
+            _ when !string.IsNullOrEmpty(pcgwEngineRaw) =>
+                $"Engine not auto-detected locally — PCGamingWiki lists \"{pcgwEngineRaw}\" (not a RenoDX-supported engine); both options remain available.",
+            _ => "Engine not auto-detected — both Unreal and Unity options are available."
         };
 
         public bool CanInstallDxvk => DxvkSupportedApis.Contains(detectedDxvkApi);
@@ -50,7 +58,8 @@ namespace HdrUpscaleManager.UI
             GraphicsApi.D3D8 => "Detected graphics API: DirectX 8.",
             GraphicsApi.D3D9 => "Detected graphics API: DirectX 9.",
             GraphicsApi.D3D10 => "Detected graphics API: DirectX 10.",
-            GraphicsApi.Unknown => "Graphics API not detected (game not installed, or its executable couldn't be read) — install disabled.",
+            GraphicsApi.Unknown when pcgwLookupInProgress => "Graphics API not detected locally — checking PCGamingWiki…",
+            GraphicsApi.Unknown => "Graphics API not detected (game not installed, or its executable couldn't be read, and PCGamingWiki had no confident answer) — install disabled.",
             _ => $"Detected graphics API: {detectedDxvkApi} — DXVK+Lilium HDR isn't offered for this API."
         };
 
@@ -168,6 +177,48 @@ namespace HdrUpscaleManager.UI
             OptiScalerUninstallCommand = new RelayCommand(() => Run(UninstallOptiScalerAsync), () => !IsBusy && OptiScalerRecords.Get(GameId) != null);
 
             RefreshStatuses();
+
+            if (detectedRenoDxEngine == null || detectedDxvkApi == GraphicsApi.Unknown)
+            {
+                pcgwLookupInProgress = true;
+                _ = RefreshDetectionFromPcGamingWikiAsync();
+            }
+        }
+
+        /* Fire-and-forget from the constructor — local detection already ran synchronously above,
+           this only fills in whichever of the two came back inconclusive. Every bound property
+           that depends on the two detected-* fields gets an explicit OnPropertyChanged, and
+           CommandManager is nudged directly since RelayCommand's CanExecute re-evaluation is tied
+           to CommandManager.RequerySuggested (fires on focus/keyboard/mouse), which nothing raises
+           on its own when a background task finishes with no user interaction. */
+        private async Task RefreshDetectionFromPcGamingWikiAsync()
+        {
+            try
+            {
+                var cacheDir = Path.Combine(userDataPath, "PcGamingWikiCache");
+                var lookup = await new PcGamingWikiService(cacheDir).LookupAsync(GameName).ConfigureAwait(true);
+
+                if (detectedRenoDxEngine == null && lookup.MappedEngine != null)
+                    detectedRenoDxEngine = lookup.MappedEngine;
+                pcgwEngineRaw = lookup.EngineRaw;
+
+                if (detectedDxvkApi == GraphicsApi.Unknown && lookup.ConfidentGraphicsApi != null)
+                    detectedDxvkApi = lookup.ConfidentGraphicsApi.Value;
+            }
+            catch (Exception ex)
+            {
+                Log.Warn(ex, $"PCGamingWiki fallback detection failed for '{GameName}'.");
+            }
+            finally
+            {
+                pcgwLookupInProgress = false;
+                OnPropertyChanged(nameof(RenoDxEngineDetectionText));
+                OnPropertyChanged(nameof(CanInstallUnrealRenoDx));
+                OnPropertyChanged(nameof(CanInstallUnityRenoDx));
+                OnPropertyChanged(nameof(DxvkApiDetectionText));
+                OnPropertyChanged(nameof(CanInstallDxvk));
+                CommandManager.InvalidateRequerySuggested();
+            }
         }
 
         private string GameId => Game.Id.ToString();
