@@ -151,5 +151,24 @@ namespace HdrUpscaleManager.Tests
 
             Assert.Equal("Correct Wiki Title", match.Name);
         }
+
+        [Theory]
+        [InlineData("Control Ultimate Edition", "Control")]
+        [InlineData("Code Vein II - Game of the Year Edition", "Code Vein II")]
+        [InlineData("Ori and the Blind Forest: Definitive Edition", "Ori and the Blind Forest")]
+        [InlineData("Resident Evil 4 Remastered", "Resident Evil 4")]
+        public void StripKnownEditionSuffix_RemovesTrailingKnownEditionPhrase(string input, string expected)
+        {
+            Assert.Equal(expected, GameNameMatcher.StripKnownEditionSuffix(input));
+        }
+
+        [Theory]
+        [InlineData("Doom Eternal")]
+        [InlineData("Hollow Knight: Silksong")]
+        [InlineData("Control")]
+        public void StripKnownEditionSuffix_NoKnownSuffix_ReturnsNameUnchanged(string input)
+        {
+            Assert.Equal(input, GameNameMatcher.StripKnownEditionSuffix(input));
+        }
     }
 }

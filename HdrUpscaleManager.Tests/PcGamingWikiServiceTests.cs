@@ -137,5 +137,44 @@ namespace HdrUpscaleManager.Tests
 
             Assert.Null(result);
         }
+
+        [Fact]
+        public void InferConfidentlyAboveDxvkRange_OnlyD3D11And12Listed_ReturnsTrue()
+        {
+            // Control's real PCGamingWiki entry — ambiguous about which of 11/12 actually loads,
+            // but that ambiguity doesn't matter for DXVK, which supports neither.
+            var result = PcGamingWikiService.InferConfidentlyAboveDxvkRange(new List<string> { "11", "12" });
+
+            Assert.True(result);
+        }
+
+        [Fact]
+        public void InferConfidentlyAboveDxvkRange_SingleD3D11Version_ReturnsTrue()
+        {
+            Assert.True(PcGamingWikiService.InferConfidentlyAboveDxvkRange(new List<string> { "11" }));
+        }
+
+        [Fact]
+        public void InferConfidentlyAboveDxvkRange_IncludesD3D10_ReturnsFalse()
+        {
+            // A DXVK-eligible path exists, even if the game also offers 11/12 — not "above range".
+            var result = PcGamingWikiService.InferConfidentlyAboveDxvkRange(new List<string> { "10", "11" });
+
+            Assert.False(result);
+        }
+
+        [Fact]
+        public void InferConfidentlyAboveDxvkRange_EmptyList_ReturnsFalse()
+        {
+            Assert.False(PcGamingWikiService.InferConfidentlyAboveDxvkRange(new List<string>()));
+        }
+
+        [Fact]
+        public void InferConfidentlyAboveDxvkRange_UnrecognizedVersionString_ReturnsFalse()
+        {
+            var result = PcGamingWikiService.InferConfidentlyAboveDxvkRange(new List<string> { "n/a" });
+
+            Assert.False(result);
+        }
     }
 }

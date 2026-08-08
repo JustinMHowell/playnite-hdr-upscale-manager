@@ -43,6 +43,10 @@ namespace HdrUpscaleManager.UI
         private string pcgwEngineRaw;
         private bool pcgwLookupInProgress;
         private Task pcgwLookupTask;
+        /* Set from PcGamingWikiService.InferConfidentlyAboveDxvkRange — true only when every
+           listed Direct3D version is 11/12 (just not sure which), as opposed to detectedDxvkApi
+           staying Unknown for "can't tell at all". See ShowDxvkSection. */
+        private bool wikiConfidentlyAboveDxvkRange;
 
         public Game Game { get; }
         public string GameName => Game.Name;
@@ -66,6 +70,18 @@ namespace HdrUpscaleManager.UI
            the PCGamingWiki fallback, and hiding the button on every "not detected yet" instant
            would flicker it in and out as detection completes. */
         public bool ShowDxvkInstallButton => detectedDxvkApi == GraphicsApi.Unknown || CanInstallDxvk;
+        /* Gates the whole DXVK+Lilium HDR section, not just its Install button — true whenever
+           we're actually SURE the game's API is above DXVK's D3D8/9/10 range, either because
+           local PE inspection found a definite D3D11/12/OpenGL/Vulkan import directly (a known,
+           non-Unknown value that still fails CanInstallDxvk), or because PCGamingWiki confirms
+           every listed version is 11/12 (Control's case: its own exe delegates rendering to an
+           internal engine DLL, so PE inspection alone can't tell, but the wiki lists "11, 12" —
+           ambiguous about which, but not about being too high either way). Unlike
+           ShowDxvkInstallButton, there's no "flicker while still checking" concern here: hiding
+           only ever happens once a check has actually concluded "definitely no", never while a
+           lookup is still in progress. */
+        public bool ShowDxvkSection =>
+            !((detectedDxvkApi != GraphicsApi.Unknown && !CanInstallDxvk) || wikiConfidentlyAboveDxvkRange);
         public string DxvkApiDetectionText => detectedDxvkApi switch
         {
             GraphicsApi.D3D8 => "Detected graphics API: DirectX 8.",
@@ -234,6 +250,8 @@ namespace HdrUpscaleManager.UI
 
                 if (detectedDxvkApi == GraphicsApi.Unknown && lookup.ConfidentGraphicsApi != null)
                     detectedDxvkApi = lookup.ConfidentGraphicsApi.Value;
+                if (detectedDxvkApi == GraphicsApi.Unknown && lookup.ConfidentlyAboveDxvkRange)
+                    wikiConfidentlyAboveDxvkRange = true;
 
                 if (reShadeGraphicsApi == GraphicsApi.Unknown && lookup.ConfidentGraphicsApiForReShade != null)
                     reShadeGraphicsApi = lookup.ConfidentGraphicsApiForReShade.Value;
@@ -251,6 +269,7 @@ namespace HdrUpscaleManager.UI
                 OnPropertyChanged(nameof(DxvkApiDetectionText));
                 OnPropertyChanged(nameof(CanInstallDxvk));
                 OnPropertyChanged(nameof(ShowDxvkInstallButton));
+                OnPropertyChanged(nameof(ShowDxvkSection));
                 CommandManager.InvalidateRequerySuggested();
             }
         }

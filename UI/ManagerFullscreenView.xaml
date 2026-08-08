@@ -143,14 +143,16 @@
                         <Button Content="Uninstall" Style="{StaticResource FsButton}" Command="{Binding LumaUninstallCommand}"/>
                     </StackPanel>
 
-                    <TextBlock Text="DXVK+Lilium HDR" Style="{StaticResource FsSectionTitle}"/>
-                    <TextBlock Text="{Binding DxvkStatus}" Style="{StaticResource FsSectionStatus}"/>
-                    <TextBlock Text="{Binding DxvkApiDetectionText}" Style="{StaticResource FsSectionStatus}"/>
-                    <StackPanel Orientation="Horizontal" Margin="0,0,0,20">
-                        <Button Content="Install (DX8/DX9/DX10)" Style="{StaticResource FsButton}" Command="{Binding DxvkInstallCommand}"
-                                IsEnabled="{Binding CanInstallDxvk}" Visibility="{Binding ShowDxvkInstallButton, Converter={StaticResource BoolToVis}}"/>
-                        <Button Content="Check update" Style="{StaticResource FsButton}" Command="{Binding DxvkUpdateCommand}"/>
-                        <Button Content="Uninstall" Style="{StaticResource FsButton}" Command="{Binding DxvkUninstallCommand}"/>
+                    <StackPanel Visibility="{Binding ShowDxvkSection, Converter={StaticResource BoolToVis}}">
+                        <TextBlock Text="DXVK+Lilium HDR" Style="{StaticResource FsSectionTitle}"/>
+                        <TextBlock Text="{Binding DxvkStatus}" Style="{StaticResource FsSectionStatus}"/>
+                        <TextBlock Text="{Binding DxvkApiDetectionText}" Style="{StaticResource FsSectionStatus}"/>
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,20">
+                            <Button Content="Install (DX8/DX9/DX10)" Style="{StaticResource FsButton}" Command="{Binding DxvkInstallCommand}"
+                                    IsEnabled="{Binding CanInstallDxvk}" Visibility="{Binding ShowDxvkInstallButton, Converter={StaticResource BoolToVis}}"/>
+                            <Button Content="Check update" Style="{StaticResource FsButton}" Command="{Binding DxvkUpdateCommand}"/>
+                            <Button Content="Uninstall" Style="{StaticResource FsButton}" Command="{Binding DxvkUninstallCommand}"/>
+                        </StackPanel>
                     </StackPanel>
 
                     <TextBlock Text="OptiScaler (AMD)" Style="{StaticResource FsSectionTitle}"/>

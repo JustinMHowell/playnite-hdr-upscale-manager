@@ -87,7 +87,7 @@
                     </StackPanel>
                 </Border>
 
-                <Border Style="{StaticResource SectionBorder}">
+                <Border Style="{StaticResource SectionBorder}" Visibility="{Binding ShowDxvkSection, Converter={StaticResource BoolToVis}}">
                     <StackPanel>
                         <TextBlock Text="DXVK+Lilium HDR" Style="{StaticResource SectionTitle}"/>
                         <TextBlock Text="{Binding DxvkStatus}" Style="{StaticResource SectionStatus}"/>

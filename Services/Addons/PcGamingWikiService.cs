@@ -27,6 +27,15 @@ namespace HdrUpscaleManager.Services.Addons
            ReShade supports the full D3D8-D3D12 range (plus OpenGL), so unlike DXVK there's no
            version ceiling to reject above. See InferConfidentGraphicsApiForReShade. */
         public GraphicsApi? ConfidentGraphicsApiForReShade { get; set; }
+
+        /* Distinct from ConfidentGraphicsApi being null: that null collapses two different
+           situations — "can't tell at all" and "definitely above DXVK's range, just not sure
+           which of 11/12 it is" — into the same "not confident" bucket, which is why a game
+           like Control (PCGamingWiki lists "11, 12") sits there showing a disabled/greyed
+           install button instead of hiding the whole section. This is true only for the second
+           case, where the section can hide outright since no answer within 8/9/10 is possible
+           no matter what. See InferConfidentlyAboveDxvkRange. */
+        public bool ConfidentlyAboveDxvkRange { get; set; }
     }
 
     /* Fallback engine/graphics-API lookup via PCGamingWiki's public Cargo query API, used only
@@ -67,6 +76,7 @@ namespace HdrUpscaleManager.Services.Addons
                     result.Direct3DVersionsRaw = await QueryDirect3DVersionsAsync(pageTitle).ConfigureAwait(false);
                     result.ConfidentGraphicsApi = InferConfidentGraphicsApi(result.Direct3DVersionsRaw);
                     result.ConfidentGraphicsApiForReShade = InferConfidentGraphicsApiForReShade(result.Direct3DVersionsRaw);
+                    result.ConfidentlyAboveDxvkRange = InferConfidentlyAboveDxvkRange(result.Direct3DVersionsRaw);
 
                     result.EngineRaw = CleanEngineName(await QueryEnginesAsync(pageTitle).ConfigureAwait(false));
                     result.MappedEngine = MapEngine(result.EngineRaw);
@@ -81,9 +91,23 @@ namespace HdrUpscaleManager.Services.Addons
             return result;
         }
 
+        /* Retries with a known edition suffix stripped (e.g. "Control Ultimate Edition" ->
+           "Control") when the plain name comes back empty — opensearch does a prefix match, and
+           a store/Playnite edition suffix is rarely part of the wiki's actual page title.
+           Confirmed live 2026-08-08: searching "Control Ultimate Edition" returns zero results,
+           "Control" resolves immediately. */
         private static async Task<string> ResolvePageTitleAsync(string gameName)
         {
-            var url = $"{ApiUrl}?action=opensearch&search={Uri.EscapeDataString(gameName)}&limit=1&namespace=0&format=json";
+            var direct = await QueryOpenSearchAsync(gameName).ConfigureAwait(false);
+            if (direct != null) return direct;
+
+            var stripped = GameNameMatcher.StripKnownEditionSuffix(gameName);
+            return stripped != gameName ? await QueryOpenSearchAsync(stripped).ConfigureAwait(false) : null;
+        }
+
+        private static async Task<string> QueryOpenSearchAsync(string searchTerm)
+        {
+            var url = $"{ApiUrl}?action=opensearch&search={Uri.EscapeDataString(searchTerm)}&limit=1&namespace=0&format=json";
             var json = await Http.GetStringAsync(url).ConfigureAwait(false);
             var titles = JArray.Parse(json).ElementAtOrDefault(1) as JArray;
             return titles != null && titles.Count > 0 ? (string)titles[0] : null;
@@ -162,6 +186,37 @@ namespace HdrUpscaleManager.Services.Addons
 
         private static GraphicsApi Max(GraphicsApi? current, GraphicsApi candidate) =>
             current == null || candidate > current.Value ? candidate : current.Value;
+
+        /* Every listed version has to be a recognized 11 or 12 for this to be true — a version
+           that doesn't parse at all is left as "don't know" (false), same caution as
+           InferConfidentGraphicsApi, rather than assumed to be above range. */
+        public static bool InferConfidentlyAboveDxvkRange(List<string> versions)
+        {
+            if (versions == null || versions.Count == 0) return false;
+
+            var sawHighApi = false;
+            foreach (var version in versions)
+            {
+                var match = LeadingVersionNumber.Match(version);
+                if (!match.Success) return false;
+
+                switch (match.Groups[1].Value)
+                {
+                    case "8":
+                    case "9":
+                    case "10":
+                        return false; // a DXVK-eligible path exists — not "above range".
+                    case "11":
+                    case "12":
+                        sawHighApi = true;
+                        break;
+                    default:
+                        return false; // unrecognized — don't know, not "confidently" anything.
+                }
+            }
+
+            return sawHighApi;
+        }
 
         /* Unlike InferConfidentGraphicsApi, ReShade supports the full D3D8-D3D12 range, so
            there's no version ceiling to reject above — confirmed live 2026-08-08 against Hollow

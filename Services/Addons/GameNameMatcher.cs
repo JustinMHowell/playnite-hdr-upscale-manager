@@ -134,5 +134,35 @@ namespace HdrUpscaleManager.Services.Addons
 
             return null;
         }
+
+        /* Returns the given name with a trailing "same game, different release" suffix removed —
+           e.g. "Control Ultimate Edition" -> "Control" — reusing the EditionSuffixes whitelist
+           above. For a caller doing an external title search rather than matching against a
+           known candidate list (PcGamingWikiService's opensearch call, which has no such list),
+           the plain edition-suffixed name often finds nothing at all: MediaWiki's opensearch does
+           a prefix match, and "Control Ultimate Edition" isn't a prefix of the wiki's actual page
+           title ("Control") — confirmed live 2026-08-08, zero results. Returns the original name
+           unchanged if no known suffix is found at the end. */
+        public static string StripKnownEditionSuffix(string name)
+        {
+            if (string.IsNullOrEmpty(name)) return name;
+
+            /* Up to 5 trailing tokens — "game of the year edition" is the longest phrase in
+               EditionSuffixes (game/of/the/year/edition). */
+            var tokenMatches = Regex.Matches(name, "[A-Za-z0-9]+");
+            for (var take = 1; take <= 5 && take < tokenMatches.Count; take++)
+            {
+                var suffixBlob = string.Concat(tokenMatches
+                    .Cast<System.Text.RegularExpressions.Match>()
+                    .Skip(tokenMatches.Count - take)
+                    .Select(m => m.Value.ToLowerInvariant()));
+                if (!EditionSuffixes.Contains(suffixBlob)) continue;
+
+                var cutIndex = tokenMatches[tokenMatches.Count - take].Index;
+                return name.Substring(0, cutIndex).TrimEnd(' ', ':', '-', '–', '—');
+            }
+
+            return name;
+        }
     }
 }
