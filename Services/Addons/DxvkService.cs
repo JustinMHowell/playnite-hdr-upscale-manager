@@ -52,7 +52,7 @@ namespace HdrUpscaleManager.Services.Addons
 
         private static readonly HttpClient Http = CreateHttpClient();
 
-        public static async Task<DxvkInstallResult> InstallAsync(string gameInstallPath, string cacheDirectory)
+        public static async Task<DxvkInstallResult> InstallAsync(string gameInstallPath, string cacheDirectory, GraphicsApi? apiOverride = null)
         {
             var exePath = PeInspector.FindGameExecutable(gameInstallPath);
             if (exePath == null) return Fail("No executable found in the install folder.");
@@ -60,8 +60,9 @@ namespace HdrUpscaleManager.Services.Addons
             var info = PeInspector.Inspect(exePath);
             if (info == null) return Fail("Could not read the game executable's PE header.");
 
+            var api = apiOverride ?? info.Api;
             string[] requiredDlls;
-            switch (info.Api)
+            switch (api)
             {
                 case GraphicsApi.D3D8:
                     requiredDlls = new[] { "d3d8.dll" };
@@ -74,7 +75,7 @@ namespace HdrUpscaleManager.Services.Addons
                     break;
                 default:
                     return Fail(
-                        $"DXVK+Lilium HDR isn't offered for {info.Api} — DX11 is excluded (DXVK has known " +
+                        $"DXVK+Lilium HDR isn't offered for {api} — DX11 is excluded (DXVK has known " +
                         "overlay/VRR/perf issues on DX11 per upstream), and DX12/Vulkan games don't need a translation layer.");
             }
 
@@ -132,7 +133,7 @@ namespace HdrUpscaleManager.Services.Addons
                 Log.Warn(ex, "Failed to write dxvk.conf — DXVK will use its built-in defaults (HDR not force-enabled).");
             }
 
-            Log.Info($"Installed Lilium HDR DXVK {release.Version} ({info.Api}) to '{gameInstallPath}'.");
+            Log.Info($"Installed Lilium HDR DXVK {release.Version} ({api}) to '{gameInstallPath}'.");
             return new DxvkInstallResult
             {
                 Success = true,

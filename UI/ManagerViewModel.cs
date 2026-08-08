@@ -320,6 +320,13 @@ namespace HdrUpscaleManager.UI
            without a second, separate lookup. */
         private GraphicsApi? KnownGraphicsApiOrNull => reShadeGraphicsApi == GraphicsApi.Unknown ? (GraphicsApi?)null : reShadeGraphicsApi;
 
+        /* Same idea as KnownGraphicsApiOrNull, scoped to detectedDxvkApi instead: DxvkService
+           re-inspects the game's PE header itself and has no way to see what CanInstallDxvk
+           already resolved (manifest override, or a PCGamingWiki fallback confident within
+           DXVK's own D3D8-D3D10 ceiling) — confirmed live for Mafia (2002), whose Game.exe import
+           layout reads as GraphicsApi.Unknown on its own, same class of gap as The Witcher 3. */
+        private GraphicsApi? KnownDxvkApiOrNull => detectedDxvkApi == GraphicsApi.Unknown ? (GraphicsApi?)null : detectedDxvkApi;
+
         /* The constructor kicks off RefreshDetectionFromPcGamingWikiAsync fire-and-forget when
            local detection (manifest override, then PE inspection) came back inconclusive — fine
            for the window just rendering "checking…" text, but a RenoDX install triggered right
@@ -693,7 +700,7 @@ namespace HdrUpscaleManager.UI
             try
             {
                 var cacheDir = Path.Combine(userDataPath, "DxvkCache");
-                var result = await DxvkService.InstallAsync(Game.InstallDirectory, cacheDir).ConfigureAwait(true);
+                var result = await DxvkService.InstallAsync(Game.InstallDirectory, cacheDir, KnownDxvkApiOrNull).ConfigureAwait(true);
                 if (!result.Success)
                 {
                     StatusText = result.Error;
