@@ -169,7 +169,8 @@ namespace HdrUpscaleManager.Services.Addons
 
             try
             {
-                DeployIni(gameInstallPath, dlssInputs);
+                if (DeployIni(gameInstallPath, dlssInputs))
+                    installedFiles.Add("OptiScaler.ini");
             }
             catch (Exception ex)
             {
@@ -259,11 +260,16 @@ namespace HdrUpscaleManager.Services.Addons
                 CopyDirectoryRecursive(dir, Path.Combine(destDir, Path.GetFileName(dir)));
         }
 
-        internal static void DeployIni(string gameInstallPath, bool dlssInputs)
+        /* Returns true only when this call actually wrote a fresh ini — false when an existing
+           one was preserved. InstallAsync uses this to decide whether "OptiScaler.ini" belongs
+           in InstalledFiles: tracking it unconditionally would make Uninstall delete a user's
+           own pre-existing ini it never created, the same "don't remove what you didn't create"
+           rule FileBackup's .original restore already follows elsewhere in this file. */
+        internal static bool DeployIni(string gameInstallPath, bool dlssInputs)
         {
             var targetIniPath = Path.Combine(gameInstallPath, "OptiScaler.ini");
             /* Preserve an existing per-game INI across installs/updates, matching RHI. */
-            if (File.Exists(targetIniPath)) return;
+            if (File.Exists(targetIniPath)) return false;
 
             var content = LoadIniTemplate();
             if (!dlssInputs)
@@ -278,6 +284,7 @@ namespace HdrUpscaleManager.Services.Addons
             content = ReplaceExactLine(content, "LogToFile=auto", "LogToFile=true");
 
             File.WriteAllText(targetIniPath, content.Replace("\n", Environment.NewLine));
+            return true;
         }
 
         /* Several INI keys share the literal value "=auto" — a blind string replace would touch

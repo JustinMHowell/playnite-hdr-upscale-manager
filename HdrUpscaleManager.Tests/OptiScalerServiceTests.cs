@@ -115,5 +115,27 @@ namespace HdrUpscaleManager.Tests
 
             Assert.Equal("user's own customized ini", File.ReadAllText(iniPath));
         }
+
+        [Fact]
+        public void DeployIni_WritesFreshFile_ReturnsTrue()
+        {
+            // InstallAsync uses this to decide whether "OptiScaler.ini" belongs in
+            // InstalledFiles — a leftover on The Riftbreaker/Deep Rock Galactic's real install
+            // folders (confirmed live 2026-08-09) showed Uninstall never removed it before this
+            // fix, since it was never tracked in the first place.
+            var wroteFresh = OptiScalerService.DeployIni(directory, dlssInputs: true);
+
+            Assert.True(wroteFresh);
+        }
+
+        [Fact]
+        public void DeployIni_ExistingIniPreserved_ReturnsFalse()
+        {
+            File.WriteAllText(Path.Combine(directory, "OptiScaler.ini"), "user's own customized ini");
+
+            var wroteFresh = OptiScalerService.DeployIni(directory, dlssInputs: true);
+
+            Assert.False(wroteFresh);
+        }
     }
 }
