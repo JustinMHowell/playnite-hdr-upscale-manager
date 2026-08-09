@@ -366,6 +366,13 @@ namespace HdrUpscaleManager.UI
             StatusText = "Installing ReShade…";
             try
             {
+                // Local PE inspection alone reads GraphicsApi.Unknown for a game whose player
+                // binary loads its graphics DLL dynamically rather than importing it statically
+                // (e.g. Unity — see KnownGraphicsApiOrNull's own doc comment) — awaiting the
+                // in-flight PCGamingWiki lookup here, same as EnsureReShadeInstalledForRenoDxAsync
+                // already does, avoids racing a click against that fallback still resolving.
+                if (KnownGraphicsApiOrNull == null) await EnsurePcGamingWikiLookupCompletedAsync().ConfigureAwait(true);
+
                 var cacheDir = Path.Combine(userDataPath, "ReShadeCache");
                 var result = await new ReShadeInstallService(cacheDir).InstallAsync(Game.InstallDirectory, KnownGraphicsApiOrNull).ConfigureAwait(true);
                 if (!result.Success)
@@ -718,6 +725,10 @@ namespace HdrUpscaleManager.UI
             StatusText = "Installing DXVK+Lilium HDR…";
             try
             {
+                // Same race as InstallReShadeAsync — local PE inspection can still read
+                // GraphicsApi.Unknown while the PCGamingWiki fallback lookup is in flight.
+                if (KnownDxvkApiOrNull == null) await EnsurePcGamingWikiLookupCompletedAsync().ConfigureAwait(true);
+
                 var cacheDir = Path.Combine(userDataPath, "DxvkCache");
                 var result = await DxvkService.InstallAsync(Game.InstallDirectory, cacheDir, KnownDxvkApiOrNull).ConfigureAwait(true);
                 if (!result.Success)
