@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using HdrUpscaleManager.Models;
+using HdrUpscaleManager.Models.Addons;
 using HdrUpscaleManager.Services.Addons;
 using HdrUpscaleManager.Services.ReShade;
 using Xunit;
@@ -136,6 +137,58 @@ namespace HdrUpscaleManager.Tests
             var wroteFresh = OptiScalerService.DeployIni(directory, dlssInputs: true);
 
             Assert.False(wroteFresh);
+        }
+
+        [Fact]
+        public void Uninstall_OptiPatcherPluginsFolderNowEmpty_RemovesFolderToo()
+        {
+            // Confirmed as a real leftover live 2026-08-09 on Vanquish: Uninstall deleted
+            // OptiPatcher.asi but left the now-empty "plugins" folder it was created in behind.
+            var pluginsDir = Path.Combine(directory, "plugins");
+            Directory.CreateDirectory(pluginsDir);
+            File.WriteAllText(Path.Combine(pluginsDir, "OptiPatcher.asi"), "asi bytes");
+
+            var record = new OptiScalerInstalledRecord
+            {
+                GameId = "game-1",
+                GameName = "Some Game",
+                InstallPath = directory,
+                DllName = "dxgi.dll",
+                InstalledFiles = new List<string>(),
+                OptiPatcherInstalled = true,
+            };
+
+            var result = OptiScalerService.Uninstall(record);
+
+            Assert.True(result.Success);
+            Assert.False(Directory.Exists(pluginsDir));
+        }
+
+        [Fact]
+        public void Uninstall_PluginsFolderHasOtherFiles_LeavesFolderInPlace()
+        {
+            // Another mod's ASI loader (or the game itself) might use the same "plugins" folder
+            // — only remove it if OptiPatcher.asi was genuinely the only thing in it.
+            var pluginsDir = Path.Combine(directory, "plugins");
+            Directory.CreateDirectory(pluginsDir);
+            File.WriteAllText(Path.Combine(pluginsDir, "OptiPatcher.asi"), "asi bytes");
+            File.WriteAllText(Path.Combine(pluginsDir, "SomeOtherMod.asi"), "other mod bytes");
+
+            var record = new OptiScalerInstalledRecord
+            {
+                GameId = "game-1",
+                GameName = "Some Game",
+                InstallPath = directory,
+                DllName = "dxgi.dll",
+                InstalledFiles = new List<string>(),
+                OptiPatcherInstalled = true,
+            };
+
+            var result = OptiScalerService.Uninstall(record);
+
+            Assert.True(result.Success);
+            Assert.True(Directory.Exists(pluginsDir));
+            Assert.True(File.Exists(Path.Combine(pluginsDir, "SomeOtherMod.asi")));
         }
     }
 }

@@ -441,8 +441,16 @@ namespace HdrUpscaleManager.Services.Addons
 
                 if (record.OptiPatcherInstalled)
                 {
-                    var asiPath = Path.Combine(record.InstallPath, "plugins", "OptiPatcher.asi");
+                    var pluginsDir = Path.Combine(record.InstallPath, "plugins");
+                    var asiPath = Path.Combine(pluginsDir, "OptiPatcher.asi");
                     if (File.Exists(asiPath)) File.Delete(asiPath);
+
+                    /* Only if now empty — TryInstallOptiPatcherAsync's own Directory.CreateDirectory
+                       is a no-op when "plugins" already existed (e.g. another mod's ASI loader
+                       uses it too), so removing it unconditionally could delete a folder this
+                       install never actually created. */
+                    if (Directory.Exists(pluginsDir) && !Directory.EnumerateFileSystemEntries(pluginsDir).Any())
+                        Directory.Delete(pluginsDir);
                 }
 
                 if (record.DlssDllInstalled)
