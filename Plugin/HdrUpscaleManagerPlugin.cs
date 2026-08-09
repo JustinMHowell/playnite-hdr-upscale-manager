@@ -6,6 +6,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using System.Windows.Controls;
 
 namespace HdrUpscaleManager.Plugin
 {
@@ -25,12 +26,20 @@ namespace HdrUpscaleManager.Plugin
             ?? typeof(HdrUpscaleManagerPlugin).Assembly.GetName().Version?.ToString()
             ?? "0.0.0";
 
+        private readonly HdrUpscaleManagerSettings settings;
+
         public HdrUpscaleManagerPlugin(IPlayniteAPI api) : base(api)
         {
             Log.Initialize(System.IO.Path.Combine(GetPluginUserDataPath(), "logs"));
             logger.Info($"HDR & Upscale Manager v{PluginVersion} loaded.");
             Log.Info($"HDR & Upscale Manager v{PluginVersion} loaded.");
+            settings = new HdrUpscaleManagerSettings();
         }
+
+        public override ISettings GetSettings(bool firstRunSettings) => settings;
+
+        public override UserControl GetSettingsView(bool firstRunSettings) =>
+            new HdrUpscaleManagerSettingsView { DataContext = settings };
 
         /* Fires once Playnite (Desktop or Fullscreen — this hook is mode-agnostic) has
            finished starting up. Refreshes the manifest cache in the background so it's
