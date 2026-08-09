@@ -98,8 +98,10 @@ namespace HdrUpscaleManager.UI
         private bool isBusy;
         public bool IsBusy { get => isBusy; private set => SetProperty(ref isBusy, value); }
 
-        private string reShadeStatus = "Not tracked — installing always fetches the latest version.";
-        public string ReShadeStatus { get => reShadeStatus; private set => SetProperty(ref reShadeStatus, value); }
+        /* No installed-record backs ReShade (unlike RenoDX/Luma/DXVK/OptiScaler below) — this
+           re-detects the deployed DLL live, same as ReShadeInstallService.IsInstalled itself. */
+        public string ReShadeStatus =>
+            ReShadeInstallService.IsInstalled(Game.InstallDirectory, KnownGraphicsApiOrNull) ? "Installed." : "Not installed.";
 
         private string renoDxStatus;
         public string RenoDxStatus { get => renoDxStatus; private set => SetProperty(ref renoDxStatus, value); }
@@ -141,6 +143,7 @@ namespace HdrUpscaleManager.UI
         }
 
         public ICommand ReShadeInstallCommand { get; }
+        public ICommand ReShadeUninstallCommand { get; }
 
         public ICommand RenoDxInstallCommand { get; }
         public ICommand RenoDxInstallUnrealGenericCommand { get; }
@@ -194,6 +197,9 @@ namespace HdrUpscaleManager.UI
             reShadeGraphicsApi = detectedDxvkApi;
 
             ReShadeInstallCommand = new RelayCommand(() => Run(InstallReShadeAsync), () => !IsBusy);
+            ReShadeUninstallCommand = new RelayCommand(
+                () => Run(UninstallReShadeAsync),
+                () => !IsBusy && ReShadeInstallService.IsInstalled(Game.InstallDirectory, KnownGraphicsApiOrNull));
 
             RenoDxInstallCommand = new RelayCommand(() => Run(InstallRenoDxAsync), () => !IsBusy);
             RenoDxInstallUnrealGenericCommand = new RelayCommand(
@@ -263,6 +269,7 @@ namespace HdrUpscaleManager.UI
             finally
             {
                 pcgwLookupInProgress = false;
+                OnPropertyChanged(nameof(ReShadeStatus));
                 OnPropertyChanged(nameof(RenoDxEngineDetectionText));
                 OnPropertyChanged(nameof(CanInstallUnrealRenoDx));
                 OnPropertyChanged(nameof(CanInstallUnityRenoDx));
@@ -283,6 +290,8 @@ namespace HdrUpscaleManager.UI
 
         private void RefreshStatuses()
         {
+            OnPropertyChanged(nameof(ReShadeStatus));
+
             var renoDx = RenoDxRecords.Get(GameId);
             RenoDxStatus = renoDx != null ? $"Installed ({renoDx.MatchedWikiName ?? renoDx.AddonFileName})" : "Not installed.";
 
@@ -389,6 +398,31 @@ namespace HdrUpscaleManager.UI
                 Log.Error(ex, $"ReShade install failed for '{GameName}'.");
                 StatusText = $"ReShade install failed: {ex.Message}";
                 api.Dialogs.ShowErrorMessage(StatusText, "Install ReShade");
+            }
+        }
+
+        private async Task UninstallReShadeAsync()
+        {
+            StatusText = "Uninstalling ReShade…";
+            try
+            {
+                if (KnownGraphicsApiOrNull == null) await EnsurePcGamingWikiLookupCompletedAsync().ConfigureAwait(true);
+
+                var result = ReShadeInstallService.Uninstall(Game.InstallDirectory, KnownGraphicsApiOrNull);
+                if (!result.Success)
+                {
+                    Log.Error($"ReShade uninstall failed for '{GameName}': {result.Error}");
+                    StatusText = result.Error;
+                    return;
+                }
+
+                StatusText = "Uninstalled ReShade.";
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, $"ReShade uninstall failed for '{GameName}'.");
+                StatusText = $"ReShade uninstall failed: {ex.Message}";
+                api.Dialogs.ShowErrorMessage(StatusText, "Uninstall ReShade");
             }
         }
 

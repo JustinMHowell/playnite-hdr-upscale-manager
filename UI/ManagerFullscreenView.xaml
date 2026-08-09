@@ -110,11 +110,31 @@
 
             <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
                 <StackPanel>
-                    <TextBlock Text="ReShade" Style="{StaticResource FsSectionTitle}"/>
-                    <TextBlock Text="{Binding ReShadeStatus}" Style="{StaticResource FsSectionStatus}"/>
-                    <StackPanel Orientation="Horizontal" Margin="0,0,0,20">
-                        <Button Content="Install latest" Style="{StaticResource FsButton}" Command="{Binding ReShadeInstallCommand}"/>
-                    </StackPanel>
+                    <Grid Margin="0,0,0,20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="ReShade" Style="{StaticResource FsSectionTitle}"/>
+                            <TextBlock Text="{Binding ReShadeStatus}" Style="{StaticResource FsSectionStatus}"/>
+                            <StackPanel Orientation="Horizontal">
+                                <Button Content="Install latest" Style="{StaticResource FsButton}" Command="{Binding ReShadeInstallCommand}"/>
+                                <Button Content="Uninstall" Style="{StaticResource FsButton}" Command="{Binding ReShadeUninstallCommand}"/>
+                            </StackPanel>
+                        </StackPanel>
+
+                        <Border Grid.Column="1" Width="2" Background="#33FFFFFF" Margin="20,0"/>
+
+                        <StackPanel Grid.Column="2">
+                            <TextBlock Text="OS HDR toggle on launch/exit" Style="{StaticResource FsSectionTitle}"/>
+                            <TextBlock Text="Unverified — validate on your own display before relying on it (see PLAN.md)."
+                                       Style="{StaticResource FsSectionStatus}"/>
+                            <CheckBox Content="Enable for this game" Style="{StaticResource FsToggle}" IsChecked="{Binding HdrToggleEnabled}"/>
+                        </StackPanel>
+                    </Grid>
 
                     <TextBlock Text="RenoDX" Style="{StaticResource FsSectionTitle}"/>
                     <TextBlock Text="{Binding RenoDxStatus}" Style="{StaticResource FsSectionStatus}"/>
@@ -165,11 +185,6 @@
                         <Button Content="Check update" Style="{StaticResource FsButton}" Command="{Binding OptiScalerUpdateCommand}"/>
                         <Button Content="Uninstall" Style="{StaticResource FsButton}" Command="{Binding OptiScalerUninstallCommand}"/>
                     </StackPanel>
-
-                    <TextBlock Text="OS HDR toggle on launch/exit" Style="{StaticResource FsSectionTitle}"/>
-                    <TextBlock Text="Unverified — validate on your own display before relying on it (see PLAN.md)."
-                               Style="{StaticResource FsSectionStatus}"/>
-                    <CheckBox Content="Enable for this game" Style="{StaticResource FsToggle}" IsChecked="{Binding HdrToggleEnabled}" Margin="0,0,0,20"/>
                 </StackPanel>
             </ScrollViewer>
         </Grid>

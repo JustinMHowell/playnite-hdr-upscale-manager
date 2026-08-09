@@ -272,5 +272,59 @@ namespace HdrUpscaleManager.Tests
             Assert.True(result.Success);
             Assert.False(File.Exists(Path.Combine(directory, "dxgi.dll")));
         }
+
+        // ── ReShadeInstallService.Uninstall ─────────────────────────────────────
+
+        [Fact]
+        public void ReShadeUninstall_ProxyDllPresent_RemovesIt()
+        {
+            WriteFile("dxgi.dll", "reshade bytes");
+
+            var result = ReShadeInstallService.Uninstall(directory, GraphicsApi.D3D11);
+
+            Assert.True(result.Success);
+            Assert.False(File.Exists(Path.Combine(directory, "dxgi.dll")));
+        }
+
+        [Fact]
+        public void ReShadeUninstall_BackupExists_RestoresOriginalFile()
+        {
+            WriteFile("dxgi.dll", "reshade bytes");
+            WriteFile("dxgi.dll.original", "the game's real dxgi.dll");
+
+            var result = ReShadeInstallService.Uninstall(directory, GraphicsApi.D3D11);
+
+            Assert.True(result.Success);
+            var restoredPath = Path.Combine(directory, "dxgi.dll");
+            Assert.True(File.Exists(restoredPath));
+            Assert.Equal("the game's real dxgi.dll", File.ReadAllText(restoredPath));
+            Assert.False(File.Exists(restoredPath + ".original"));
+        }
+
+        [Fact]
+        public void ReShadeUninstall_NotInstalled_ReturnsFailure()
+        {
+            var result = ReShadeInstallService.Uninstall(directory, GraphicsApi.D3D11);
+
+            Assert.False(result.Success);
+        }
+
+        [Fact]
+        public void ReShadeUninstall_OptiScalerPresent_RefusesAndLeavesFilesAlone()
+        {
+            // OptiScaler owns "dxgi.dll" for itself once installed, and hosts ReShade under
+            // ReShadeCoexistName instead — removing either file here without going through
+            // OptiScaler's own Uninstall would desync OptiScaler's InstalledFiles record from
+            // what's actually on disk. Same reasoning as ResolveTargetDllName/IsInstalled above.
+            WriteFile("OptiScaler.ini");
+            WriteFile("dxgi.dll", "optiscaler bytes");
+            WriteFile(OptiScalerService.ReShadeCoexistName, "reshade bytes");
+
+            var result = ReShadeInstallService.Uninstall(directory, GraphicsApi.D3D11);
+
+            Assert.False(result.Success);
+            Assert.True(File.Exists(Path.Combine(directory, "dxgi.dll")));
+            Assert.True(File.Exists(Path.Combine(directory, OptiScalerService.ReShadeCoexistName)));
+        }
     }
 }

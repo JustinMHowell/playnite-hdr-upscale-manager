@@ -43,13 +43,31 @@
         <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
             <StackPanel>
                 <Border Style="{StaticResource SectionBorder}">
-                    <StackPanel>
-                        <TextBlock Text="ReShade" Style="{StaticResource SectionTitle}"/>
-                        <TextBlock Text="{Binding ReShadeStatus}" Style="{StaticResource SectionStatus}"/>
-                        <StackPanel Orientation="Horizontal">
-                            <Button Content="Install latest" Command="{Binding ReShadeInstallCommand}"/>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="ReShade" Style="{StaticResource SectionTitle}"/>
+                            <TextBlock Text="{Binding ReShadeStatus}" Style="{StaticResource SectionStatus}"/>
+                            <StackPanel Orientation="Horizontal">
+                                <Button Content="Install latest" Command="{Binding ReShadeInstallCommand}"/>
+                                <Button Content="Uninstall" Command="{Binding ReShadeUninstallCommand}"/>
+                            </StackPanel>
                         </StackPanel>
-                    </StackPanel>
+
+                        <Border Grid.Column="1" Width="1" Background="#33808080" Margin="14,0"/>
+
+                        <StackPanel Grid.Column="2">
+                            <TextBlock Text="OS HDR toggle on launch/exit" Style="{StaticResource SectionTitle}"/>
+                            <TextBlock Text="Unverified — validate on your own display before relying on it (see PLAN.md)."
+                                       Style="{StaticResource SectionStatus}"/>
+                            <CheckBox Content="Enable for this game" IsChecked="{Binding HdrToggleEnabled}" Foreground="White"/>
+                        </StackPanel>
+                    </Grid>
                 </Border>
 
                 <Border Style="{StaticResource SectionBorder}">
@@ -113,15 +131,6 @@
                             <Button Content="Check update" Command="{Binding OptiScalerUpdateCommand}"/>
                             <Button Content="Uninstall" Command="{Binding OptiScalerUninstallCommand}"/>
                         </StackPanel>
-                    </StackPanel>
-                </Border>
-
-                <Border Style="{StaticResource SectionBorder}">
-                    <StackPanel>
-                        <TextBlock Text="OS HDR toggle on launch/exit" Style="{StaticResource SectionTitle}"/>
-                        <TextBlock Text="Unverified — validate on your own display before relying on it (see PLAN.md)."
-                                   Style="{StaticResource SectionStatus}"/>
-                        <CheckBox Content="Enable for this game" IsChecked="{Binding HdrToggleEnabled}" Foreground="White"/>
                     </StackPanel>
                 </Border>
             </StackPanel>

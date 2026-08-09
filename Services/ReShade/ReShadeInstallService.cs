@@ -17,6 +17,12 @@ namespace HdrUpscaleManager.Services.ReShade
         public string Version { get; set; }
     }
 
+    public class ReShadeUninstallResult
+    {
+        public bool Success { get; set; }
+        public string Error { get; set; }
+    }
+
     /* Installer download + extraction mechanism observed in RHI's ReShadeUpdateService:
        download the installer exe, extract the DLL without ever running it, rename/copy it
        into the game folder based on the detected graphics API. */
@@ -166,6 +172,52 @@ namespace HdrUpscaleManager.Services.ReShade
                 Api = api,
                 Version = versionInfo.Version
             };
+        }
+
+        /* No installed-record backs this (unlike RenoDX/Luma/DXVK/OptiScaler) — see IsInstalled's
+           own doc comment for why ReShade tracking works differently. Re-detects the deployed DLL
+           the same way IsInstalled does, deletes it, and restores the pre-install backup
+           (BackupIfNeeded's own ".original" rename) if one exists. */
+        public static ReShadeUninstallResult Uninstall(string gameInstallPath, GraphicsApi? apiOverride = null)
+        {
+            var exePath = PeInspector.FindGameExecutable(gameInstallPath);
+            if (exePath == null) return FailUninstall("No executable found in the install folder.");
+
+            var deployDir = Path.GetDirectoryName(exePath) ?? gameInstallPath;
+
+            if (OptiScalerService.IsInstalled(deployDir))
+                return FailUninstall("OptiScaler is installed and hosts ReShade under a renamed DLL for coexistence — uninstall OptiScaler first.");
+
+            var api = apiOverride ?? PeInspector.Inspect(exePath)?.Api;
+            var proxyDllName = api != null ? ReShadeProxyDll.GetProxyDllName(api.Value) : null;
+            if (proxyDllName == null)
+                return FailUninstall("Could not determine which DLL to remove.");
+
+            var targetPath = Path.Combine(deployDir, proxyDllName);
+            if (!File.Exists(targetPath))
+                return FailUninstall("ReShade doesn't appear to be installed.");
+
+            try
+            {
+                File.Delete(targetPath);
+
+                var backupPath = targetPath + ".original";
+                if (File.Exists(backupPath)) File.Move(backupPath, targetPath);
+
+                Log.Info($"Uninstalled ReShade from '{targetPath}'.");
+                return new ReShadeUninstallResult { Success = true };
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, $"Failed to uninstall ReShade from '{targetPath}'.");
+                return new ReShadeUninstallResult { Success = false, Error = ex.Message };
+            }
+        }
+
+        private static ReShadeUninstallResult FailUninstall(string error)
+        {
+            Log.Error(error);
+            return new ReShadeUninstallResult { Success = false, Error = error };
         }
 
         /* Cache layout is cacheDirectory/<version>/ReShade_Setup_<version>_Addon.exe (see
