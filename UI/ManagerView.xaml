@@ -63,7 +63,7 @@
 
                         <StackPanel Grid.Column="2">
                             <TextBlock Text="OS HDR toggle on launch/exit" Style="{StaticResource SectionTitle}"/>
-                            <TextBlock Text="Unverified — validate on your own display before relying on it (see PLAN.md)."
+                            <TextBlock Text="Unverified — validate on your own display before relying on it."
                                        Style="{StaticResource SectionStatus}"/>
                             <CheckBox Content="Enable for this game" IsChecked="{Binding HdrToggleEnabled}" Foreground="White" AutomationProperties.AutomationId="HdrToggleEnabled"/>
                         </StackPanel>
