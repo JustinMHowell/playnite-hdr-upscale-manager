@@ -139,6 +139,10 @@ namespace HdrUpscaleManager.UiTests
                 CleanUpFreshlyCreatedFile(Path.Combine(record.InstallPath, relative), testStartedUtc);
             }
 
+            // Luma's own runtime log (ReShade.log — see the class doc comment) isn't a deployed
+            // file, so it's not in InstalledFiles above and needs its own cleanup line.
+            CleanUpFreshlyCreatedFile(Path.Combine(record.InstallPath, "ReShade.log"), testStartedUtc);
+
             // Luma's own record store entry — mirrors what ManagerViewModel's UninstallLumaAsync
             // does (LumaRecords.Remove), done directly here since there's no need to reopen the
             // manager window just to click a button for a plain JSON file edit.
