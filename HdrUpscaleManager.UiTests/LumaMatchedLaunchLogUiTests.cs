@@ -57,7 +57,7 @@ namespace HdrUpscaleManager.UiTests
                 var appeared = false;
                 for (var attempt = 1; attempt <= maxAttempts && !appeared; attempt++)
                 {
-                    ManagerSectionNavigation.ClickSectionButton(managerWindow, "Luma", "Install", output);
+                    ManagerSectionNavigation.ClickButton(managerWindow, "LumaInstall", output);
                     appeared = Retry.WhileFalse(
                         () => (record = FindLumaRecordByGameName(GameName)) != null,
                         timeout: TimeSpan.FromSeconds(6),
@@ -162,7 +162,7 @@ namespace HdrUpscaleManager.UiTests
                 var recordGone = false;
                 for (var attempt = 1; attempt <= maxAttempts && !recordGone; attempt++)
                 {
-                    ManagerSectionNavigation.ClickSectionButton(managerWindow, "Luma", "Uninstall", output);
+                    ManagerSectionNavigation.ClickButton(managerWindow, "LumaUninstall", output);
                     recordGone = Retry.WhileFalse(
                         () => FindLumaRecordByGameName(GameName) == null,
                         timeout: TimeSpan.FromSeconds(3),

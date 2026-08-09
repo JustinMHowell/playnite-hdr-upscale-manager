@@ -29,7 +29,7 @@ namespace HdrUpscaleManager.UiTests
         private const string GameConfigKey = "VANQUISH";
         private const string LumaRecordStoreFileName = "luma_installs.json";
         private const string OptiScalerRecordStoreFileName = "optiscaler_installs.json";
-        private const string OptiScalerInstallButton = "Install (has FSR/XeSS)";
+        private const string OptiScalerInstallButton = "OptiScalerInstallNoDlss";
 
         private readonly ITestOutputHelper output;
 
@@ -58,7 +58,7 @@ namespace HdrUpscaleManager.UiTests
                 var lumaAppeared = false;
                 for (var attempt = 1; attempt <= lumaAttempts && !lumaAppeared; attempt++)
                 {
-                    ManagerSectionNavigation.ClickSectionButton(managerWindow, "Luma", "Install", output);
+                    ManagerSectionNavigation.ClickButton(managerWindow, "LumaInstall", output);
                     lumaAppeared = Retry.WhileFalse(
                         () => (lumaRecord = FindLumaRecordByGameName(GameName)) != null,
                         timeout: TimeSpan.FromSeconds(6),
@@ -71,7 +71,7 @@ namespace HdrUpscaleManager.UiTests
                 var osAppeared = false;
                 for (var attempt = 1; attempt <= osAttempts && !osAppeared; attempt++)
                 {
-                    ManagerSectionNavigation.ClickSectionButton(managerWindow, "OptiScaler (AMD)", OptiScalerInstallButton, output);
+                    ManagerSectionNavigation.ClickButton(managerWindow, OptiScalerInstallButton, output);
                     osAppeared = Retry.WhileFalse(
                         () => (optiScalerRecord = FindOptiScalerRecordByGameName(GameName)) != null,
                         timeout: TimeSpan.FromSeconds(6),
@@ -169,7 +169,7 @@ namespace HdrUpscaleManager.UiTests
                 var recordGone = false;
                 for (var attempt = 1; attempt <= maxAttempts && !recordGone; attempt++)
                 {
-                    ManagerSectionNavigation.ClickSectionButton(managerWindow, "OptiScaler (AMD)", "Uninstall", output);
+                    ManagerSectionNavigation.ClickButton(managerWindow, "OptiScalerUninstall", output);
                     recordGone = Retry.WhileFalse(
                         () => FindOptiScalerRecordByGameName(GameName) == null,
                         timeout: TimeSpan.FromSeconds(3),
@@ -190,7 +190,7 @@ namespace HdrUpscaleManager.UiTests
                 var lumaRecordGone = false;
                 for (var attempt = 1; attempt <= maxLumaAttempts && !lumaRecordGone; attempt++)
                 {
-                    ManagerSectionNavigation.ClickSectionButton(managerWindow, "Luma", "Uninstall", output);
+                    ManagerSectionNavigation.ClickButton(managerWindow, "LumaUninstall", output);
                     lumaRecordGone = Retry.WhileFalse(
                         () => FindLumaRecordByGameName(GameName) == null,
                         timeout: TimeSpan.FromSeconds(3),

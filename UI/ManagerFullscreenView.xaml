@@ -121,8 +121,8 @@
                             <TextBlock Text="ReShade" Style="{StaticResource FsSectionTitle}"/>
                             <TextBlock Text="{Binding ReShadeStatus}" Style="{StaticResource FsSectionStatus}"/>
                             <StackPanel Orientation="Horizontal">
-                                <Button Content="Install latest" Style="{StaticResource FsButton}" Command="{Binding ReShadeInstallCommand}"/>
-                                <Button Content="Uninstall" Style="{StaticResource FsButton}" Command="{Binding ReShadeUninstallCommand}"/>
+                                <Button Content="Install latest" Style="{StaticResource FsButton}" Command="{Binding ReShadeInstallCommand}" AutomationProperties.AutomationId="ReShadeInstall"/>
+                                <Button Content="Uninstall" Style="{StaticResource FsButton}" Command="{Binding ReShadeUninstallCommand}" AutomationProperties.AutomationId="ReShadeUninstall"/>
                             </StackPanel>
                         </StackPanel>
 
@@ -132,35 +132,35 @@
                             <TextBlock Text="OS HDR toggle on launch/exit" Style="{StaticResource FsSectionTitle}"/>
                             <TextBlock Text="Unverified — validate on your own display before relying on it (see PLAN.md)."
                                        Style="{StaticResource FsSectionStatus}"/>
-                            <CheckBox Content="Enable for this game" Style="{StaticResource FsToggle}" IsChecked="{Binding HdrToggleEnabled}"/>
+                            <CheckBox Content="Enable for this game" Style="{StaticResource FsToggle}" IsChecked="{Binding HdrToggleEnabled}" AutomationProperties.AutomationId="HdrToggleEnabled"/>
                         </StackPanel>
                     </Grid>
 
                     <TextBlock Text="RenoDX" Style="{StaticResource FsSectionTitle}"/>
                     <TextBlock Text="{Binding RenoDxStatus}" Style="{StaticResource FsSectionStatus}"/>
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
-                        <Button Content="Install" Style="{StaticResource FsButton}" Command="{Binding RenoDxInstallCommand}"/>
-                        <Button Content="Check update" Style="{StaticResource FsButton}" Command="{Binding RenoDxUpdateCommand}"/>
-                        <Button Content="Uninstall" Style="{StaticResource FsButton}" Command="{Binding RenoDxUninstallCommand}"/>
-                        <Button Content="Open link" Style="{StaticResource FsButton}" Command="{Binding OpenRenoDxExternalUrlCommand}"
+                        <Button Content="Install" Style="{StaticResource FsButton}" Command="{Binding RenoDxInstallCommand}" AutomationProperties.AutomationId="RenoDxInstall"/>
+                        <Button Content="Check update" Style="{StaticResource FsButton}" Command="{Binding RenoDxUpdateCommand}" AutomationProperties.AutomationId="RenoDxCheckUpdate"/>
+                        <Button Content="Uninstall" Style="{StaticResource FsButton}" Command="{Binding RenoDxUninstallCommand}" AutomationProperties.AutomationId="RenoDxUninstall"/>
+                        <Button Content="Open link" Style="{StaticResource FsButton}" Command="{Binding OpenRenoDxExternalUrlCommand}" AutomationProperties.AutomationId="RenoDxOpenLink"
                                 Visibility="{Binding RenoDxExternalUrl, Converter={StaticResource StringNotEmptyToVis}}"/>
                     </StackPanel>
                     <TextBlock Text="{Binding RenoDxEngineDetectionText}" Style="{StaticResource FsSectionStatus}" Margin="0,0,0,4"/>
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,20">
-                        <Button Content="Unreal Engine, generic" Style="{StaticResource FsButton}" Command="{Binding RenoDxInstallUnrealGenericCommand}"
+                        <Button Content="Unreal Engine, generic" Style="{StaticResource FsButton}" Command="{Binding RenoDxInstallUnrealGenericCommand}" AutomationProperties.AutomationId="RenoDxInstallUnrealGeneric"
                                 IsEnabled="{Binding CanInstallUnrealRenoDx}" Visibility="{Binding CanInstallUnrealRenoDx, Converter={StaticResource BoolToVis}}"/>
-                        <Button Content="Unreal Engine, UE-Extended" Style="{StaticResource FsButton}" Command="{Binding RenoDxInstallUnrealUeExtendedCommand}"
+                        <Button Content="Unreal Engine, UE-Extended" Style="{StaticResource FsButton}" Command="{Binding RenoDxInstallUnrealUeExtendedCommand}" AutomationProperties.AutomationId="RenoDxInstallUnrealUeExtended"
                                 IsEnabled="{Binding CanInstallUnrealRenoDx}" Visibility="{Binding CanInstallUnrealRenoDx, Converter={StaticResource BoolToVis}}"/>
-                        <Button Content="Unity, generic" Style="{StaticResource FsButton}" Command="{Binding RenoDxInstallUnityCommand}"
+                        <Button Content="Unity, generic" Style="{StaticResource FsButton}" Command="{Binding RenoDxInstallUnityCommand}" AutomationProperties.AutomationId="RenoDxInstallUnity"
                                 IsEnabled="{Binding CanInstallUnityRenoDx}" Visibility="{Binding CanInstallUnityRenoDx, Converter={StaticResource BoolToVis}}"/>
                     </StackPanel>
 
                     <TextBlock Text="Luma" Style="{StaticResource FsSectionTitle}"/>
                     <TextBlock Text="{Binding LumaStatus}" Style="{StaticResource FsSectionStatus}"/>
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,20">
-                        <Button Content="Install" Style="{StaticResource FsButton}" Command="{Binding LumaInstallCommand}"/>
-                        <Button Content="Check update" Style="{StaticResource FsButton}" Command="{Binding LumaUpdateCommand}"/>
-                        <Button Content="Uninstall" Style="{StaticResource FsButton}" Command="{Binding LumaUninstallCommand}"/>
+                        <Button Content="Install" Style="{StaticResource FsButton}" Command="{Binding LumaInstallCommand}" AutomationProperties.AutomationId="LumaInstall"/>
+                        <Button Content="Check update" Style="{StaticResource FsButton}" Command="{Binding LumaUpdateCommand}" AutomationProperties.AutomationId="LumaCheckUpdate"/>
+                        <Button Content="Uninstall" Style="{StaticResource FsButton}" Command="{Binding LumaUninstallCommand}" AutomationProperties.AutomationId="LumaUninstall"/>
                     </StackPanel>
 
                     <StackPanel Visibility="{Binding ShowDxvkSection, Converter={StaticResource BoolToVis}}">
@@ -168,22 +168,22 @@
                         <TextBlock Text="{Binding DxvkStatus}" Style="{StaticResource FsSectionStatus}"/>
                         <TextBlock Text="{Binding DxvkApiDetectionText}" Style="{StaticResource FsSectionStatus}"/>
                         <StackPanel Orientation="Horizontal" Margin="0,0,0,20">
-                            <Button Content="Install (DX8/DX9/DX10)" Style="{StaticResource FsButton}" Command="{Binding DxvkInstallCommand}"
+                            <Button Content="Install (DX8/DX9/DX10)" Style="{StaticResource FsButton}" Command="{Binding DxvkInstallCommand}" AutomationProperties.AutomationId="DxvkInstall"
                                     IsEnabled="{Binding CanInstallDxvk}" Visibility="{Binding ShowDxvkInstallButton, Converter={StaticResource BoolToVis}}"/>
-                            <Button Content="Check update" Style="{StaticResource FsButton}" Command="{Binding DxvkUpdateCommand}"/>
-                            <Button Content="Uninstall" Style="{StaticResource FsButton}" Command="{Binding DxvkUninstallCommand}"/>
+                            <Button Content="Check update" Style="{StaticResource FsButton}" Command="{Binding DxvkUpdateCommand}" AutomationProperties.AutomationId="DxvkCheckUpdate"/>
+                            <Button Content="Uninstall" Style="{StaticResource FsButton}" Command="{Binding DxvkUninstallCommand}" AutomationProperties.AutomationId="DxvkUninstall"/>
                         </StackPanel>
                     </StackPanel>
 
                     <TextBlock Text="OptiScaler (AMD)" Style="{StaticResource FsSectionTitle}"/>
                     <TextBlock Text="{Binding OptiScalerStatus}" Style="{StaticResource FsSectionStatus}"/>
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
-                        <Button Content="Install (DLSS-only game)" Style="{StaticResource FsButton}" Command="{Binding OptiScalerInstallDlssCommand}"/>
-                        <Button Content="Install (has FSR/XeSS)" Style="{StaticResource FsButton}" Command="{Binding OptiScalerInstallNoDlssCommand}"/>
+                        <Button Content="Install (DLSS-only game)" Style="{StaticResource FsButton}" Command="{Binding OptiScalerInstallDlssCommand}" AutomationProperties.AutomationId="OptiScalerInstallDlss"/>
+                        <Button Content="Install (has FSR/XeSS)" Style="{StaticResource FsButton}" Command="{Binding OptiScalerInstallNoDlssCommand}" AutomationProperties.AutomationId="OptiScalerInstallNoDlss"/>
                     </StackPanel>
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,20">
-                        <Button Content="Check update" Style="{StaticResource FsButton}" Command="{Binding OptiScalerUpdateCommand}"/>
-                        <Button Content="Uninstall" Style="{StaticResource FsButton}" Command="{Binding OptiScalerUninstallCommand}"/>
+                        <Button Content="Check update" Style="{StaticResource FsButton}" Command="{Binding OptiScalerUpdateCommand}" AutomationProperties.AutomationId="OptiScalerCheckUpdate"/>
+                        <Button Content="Uninstall" Style="{StaticResource FsButton}" Command="{Binding OptiScalerUninstallCommand}" AutomationProperties.AutomationId="OptiScalerUninstall"/>
                     </StackPanel>
                 </StackPanel>
             </ScrollViewer>

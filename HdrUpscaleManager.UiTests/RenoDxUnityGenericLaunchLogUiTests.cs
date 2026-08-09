@@ -56,7 +56,7 @@ namespace HdrUpscaleManager.UiTests
 
             try
             {
-                ManagerSectionNavigation.ClickSectionButton(managerWindow, "RenoDX", "Unity, generic", output);
+                ManagerSectionNavigation.ClickButton(managerWindow, "RenoDxInstallUnity", output);
 
                 var appeared = Retry.WhileFalse(
                     () => (addonPath = FindFileRecursive(dir, RenoDxAddonPatterns)) != null,

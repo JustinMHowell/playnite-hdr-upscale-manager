@@ -85,7 +85,7 @@ namespace HdrUpscaleManager.UiTests
 
             try
             {
-                ManagerSectionNavigation.ClickSectionButton(managerWindow, "RenoDX", "Install", output);
+                ManagerSectionNavigation.ClickButton(managerWindow, "RenoDxInstall", output);
 
                 var installedPath = WaitForInstall(gameName);
                 Assert.True(File.Exists(installedPath),
@@ -168,7 +168,7 @@ namespace HdrUpscaleManager.UiTests
 
             for (var attempt = 1; attempt <= maxAttempts && !recordGone; attempt++)
             {
-                ManagerSectionNavigation.ClickSectionButton(managerWindow, "RenoDX", "Uninstall", output);
+                ManagerSectionNavigation.ClickButton(managerWindow, "RenoDxUninstall", output);
                 recordGone = Retry.WhileFalse(
                     () => FindRecordByGameName(gameName) == null,
                     timeout: TimeSpan.FromSeconds(3),

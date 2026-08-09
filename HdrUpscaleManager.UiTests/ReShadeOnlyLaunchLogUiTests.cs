@@ -63,7 +63,7 @@ namespace HdrUpscaleManager.UiTests
             string reShadeProxyPath = null;
             try
             {
-                ManagerSectionNavigation.ClickSectionButton(managerWindow, "ReShade", "Install latest", output);
+                ManagerSectionNavigation.ClickButton(managerWindow, "ReShadeInstall", output);
 
                 reShadeProxyPath = WaitForReShadeInstall(managerWindow, gameInstallDirectory);
                 output.WriteLine($"ReShade installed as '{reShadeProxyPath}'.");

@@ -43,7 +43,7 @@ namespace HdrUpscaleManager.UiTests
     {
         private const string GameName = "Deep Rock Galactic";
         private const string GameConfigKey = "DEEPROCKGALACTIC";
-        private const string OptiScalerInstallButton = "Install (has FSR/XeSS)";
+        private const string OptiScalerInstallButton = "OptiScalerInstallNoDlss";
         private const string OptiScalerRecordStoreFileName = "optiscaler_installs.json";
 
         private static readonly string[] ReShadeProxyDllCandidates = { "d3d9.dll", "dxgi.dll", "opengl32.dll" };
@@ -113,7 +113,7 @@ namespace HdrUpscaleManager.UiTests
 
             try
             {
-                ManagerSectionNavigation.ClickSectionButton(managerWindow, "ReShade", "Install latest", output);
+                ManagerSectionNavigation.ClickButton(managerWindow, "ReShadeInstall", output);
 
                 string reShadeInitialPath = null;
                 var reShadeLanded = Retry.WhileFalse(
@@ -279,7 +279,7 @@ namespace HdrUpscaleManager.UiTests
 
             for (var attempt = 1; attempt <= maxAttempts && !appeared; attempt++)
             {
-                ManagerSectionNavigation.ClickSectionButton(managerWindow, "ReShade", "Install latest", output);
+                ManagerSectionNavigation.ClickButton(managerWindow, "ReShadeInstall", output);
                 appeared = Retry.WhileFalse(
                     () => File.Exists(expectedFilePath),
                     timeout: TimeSpan.FromSeconds(6),
@@ -296,7 +296,7 @@ namespace HdrUpscaleManager.UiTests
 
             for (var attempt = 1; attempt <= maxAttempts && record == null; attempt++)
             {
-                ManagerSectionNavigation.ClickSectionButton(managerWindow, "OptiScaler (AMD)", OptiScalerInstallButton, output);
+                ManagerSectionNavigation.ClickButton(managerWindow, OptiScalerInstallButton, output);
                 Retry.WhileFalse(
                     () => (record = FindOptiScalerRecordByGameName(GameName)) != null,
                     timeout: TimeSpan.FromSeconds(6),
@@ -320,7 +320,7 @@ namespace HdrUpscaleManager.UiTests
 
             for (var attempt = 1; attempt <= maxAttempts && !recordGone; attempt++)
             {
-                ManagerSectionNavigation.ClickSectionButton(managerWindow, "OptiScaler (AMD)", "Uninstall", output);
+                ManagerSectionNavigation.ClickButton(managerWindow, "OptiScalerUninstall", output);
                 recordGone = Retry.WhileFalse(
                     () => FindOptiScalerRecordByGameName(GameName) == null,
                     timeout: TimeSpan.FromSeconds(3),

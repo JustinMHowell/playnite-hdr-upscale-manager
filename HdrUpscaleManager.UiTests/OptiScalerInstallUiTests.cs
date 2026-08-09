@@ -37,8 +37,8 @@ namespace HdrUpscaleManager.UiTests
     public class OptiScalerInstallUiTests
     {
         private const string RecordStoreFileName = "optiscaler_installs.json";
-        private const string InstallDlssOnlyButton = "Install (DLSS-only game)";
-        private const string InstallHasFsrButton = "Install (has FSR/XeSS)";
+        private const string InstallDlssOnlyButton = "OptiScalerInstallDlss";
+        private const string InstallHasFsrButton = "OptiScalerInstallNoDlss";
 
         private readonly ITestOutputHelper output;
 
@@ -200,7 +200,7 @@ namespace HdrUpscaleManager.UiTests
 
             for (var attempt = 1; attempt <= maxAttempts && record == null; attempt++)
             {
-                ManagerSectionNavigation.ClickSectionButton(managerWindow, "OptiScaler (AMD)", installButton, output);
+                ManagerSectionNavigation.ClickButton(managerWindow, installButton, output);
                 Retry.WhileFalse(
                     () => (record = FindRecordByGameName(gameName)) != null,
                     timeout: TimeSpan.FromSeconds(6),
@@ -231,7 +231,7 @@ namespace HdrUpscaleManager.UiTests
 
             for (var attempt = 1; attempt <= maxAttempts && !recordGone; attempt++)
             {
-                ManagerSectionNavigation.ClickSectionButton(managerWindow, "OptiScaler (AMD)", "Uninstall", output);
+                ManagerSectionNavigation.ClickButton(managerWindow, "OptiScalerUninstall", output);
                 recordGone = Retry.WhileFalse(
                     () => FindRecordByGameName(gameName) == null,
                     timeout: TimeSpan.FromSeconds(3),

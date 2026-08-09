@@ -138,7 +138,7 @@ namespace HdrUpscaleManager.UiTests
 
             for (var attempt = 1; attempt <= maxAttempts && record == null; attempt++)
             {
-                ManagerSectionNavigation.ClickSectionButton(managerWindow, "DXVK+Lilium HDR", "Install (DX8/DX9/DX10)", output);
+                ManagerSectionNavigation.ClickButton(managerWindow, "DxvkInstall", output);
                 Retry.WhileFalse(
                     () => (record = FindRecordByGameName(gameName)) != null,
                     timeout: TimeSpan.FromSeconds(2),
@@ -168,7 +168,7 @@ namespace HdrUpscaleManager.UiTests
 
             for (var attempt = 1; attempt <= maxAttempts && !recordGone; attempt++)
             {
-                ManagerSectionNavigation.ClickSectionButton(managerWindow, "DXVK+Lilium HDR", "Uninstall", output);
+                ManagerSectionNavigation.ClickButton(managerWindow, "DxvkUninstall", output);
                 recordGone = Retry.WhileFalse(
                     () => FindRecordByGameName(gameName) == null,
                     timeout: TimeSpan.FromSeconds(3),

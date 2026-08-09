@@ -54,8 +54,8 @@
                             <TextBlock Text="ReShade" Style="{StaticResource SectionTitle}"/>
                             <TextBlock Text="{Binding ReShadeStatus}" Style="{StaticResource SectionStatus}"/>
                             <StackPanel Orientation="Horizontal">
-                                <Button Content="Install latest" Command="{Binding ReShadeInstallCommand}"/>
-                                <Button Content="Uninstall" Command="{Binding ReShadeUninstallCommand}"/>
+                                <Button Content="Install latest" Command="{Binding ReShadeInstallCommand}" AutomationProperties.AutomationId="ReShadeInstall"/>
+                                <Button Content="Uninstall" Command="{Binding ReShadeUninstallCommand}" AutomationProperties.AutomationId="ReShadeUninstall"/>
                             </StackPanel>
                         </StackPanel>
 
@@ -65,7 +65,7 @@
                             <TextBlock Text="OS HDR toggle on launch/exit" Style="{StaticResource SectionTitle}"/>
                             <TextBlock Text="Unverified — validate on your own display before relying on it (see PLAN.md)."
                                        Style="{StaticResource SectionStatus}"/>
-                            <CheckBox Content="Enable for this game" IsChecked="{Binding HdrToggleEnabled}" Foreground="White"/>
+                            <CheckBox Content="Enable for this game" IsChecked="{Binding HdrToggleEnabled}" Foreground="White" AutomationProperties.AutomationId="HdrToggleEnabled"/>
                         </StackPanel>
                     </Grid>
                 </Border>
@@ -75,19 +75,19 @@
                         <TextBlock Text="RenoDX" Style="{StaticResource SectionTitle}"/>
                         <TextBlock Text="{Binding RenoDxStatus}" Style="{StaticResource SectionStatus}"/>
                         <StackPanel Orientation="Horizontal">
-                            <Button Content="Install" Command="{Binding RenoDxInstallCommand}"/>
-                            <Button Content="Check update" Command="{Binding RenoDxUpdateCommand}"/>
-                            <Button Content="Uninstall" Command="{Binding RenoDxUninstallCommand}"/>
-                            <Button Content="Open link" Command="{Binding OpenRenoDxExternalUrlCommand}"
+                            <Button Content="Install" Command="{Binding RenoDxInstallCommand}" AutomationProperties.AutomationId="RenoDxInstall"/>
+                            <Button Content="Check update" Command="{Binding RenoDxUpdateCommand}" AutomationProperties.AutomationId="RenoDxCheckUpdate"/>
+                            <Button Content="Uninstall" Command="{Binding RenoDxUninstallCommand}" AutomationProperties.AutomationId="RenoDxUninstall"/>
+                            <Button Content="Open link" Command="{Binding OpenRenoDxExternalUrlCommand}" AutomationProperties.AutomationId="RenoDxOpenLink"
                                     Visibility="{Binding RenoDxExternalUrl, Converter={StaticResource StringNotEmptyToVis}}"/>
                         </StackPanel>
                         <TextBlock Text="{Binding RenoDxEngineDetectionText}" Style="{StaticResource SectionStatus}" Margin="0,8,0,4"/>
                         <StackPanel Orientation="Horizontal">
-                            <Button Content="Unreal Engine, generic" Command="{Binding RenoDxInstallUnrealGenericCommand}"
+                            <Button Content="Unreal Engine, generic" Command="{Binding RenoDxInstallUnrealGenericCommand}" AutomationProperties.AutomationId="RenoDxInstallUnrealGeneric"
                                     IsEnabled="{Binding CanInstallUnrealRenoDx}" Visibility="{Binding CanInstallUnrealRenoDx, Converter={StaticResource BoolToVis}}"/>
-                            <Button Content="Unreal Engine, UE-Extended" Command="{Binding RenoDxInstallUnrealUeExtendedCommand}"
+                            <Button Content="Unreal Engine, UE-Extended" Command="{Binding RenoDxInstallUnrealUeExtendedCommand}" AutomationProperties.AutomationId="RenoDxInstallUnrealUeExtended"
                                     IsEnabled="{Binding CanInstallUnrealRenoDx}" Visibility="{Binding CanInstallUnrealRenoDx, Converter={StaticResource BoolToVis}}"/>
-                            <Button Content="Unity, generic" Command="{Binding RenoDxInstallUnityCommand}"
+                            <Button Content="Unity, generic" Command="{Binding RenoDxInstallUnityCommand}" AutomationProperties.AutomationId="RenoDxInstallUnity"
                                     IsEnabled="{Binding CanInstallUnityRenoDx}" Visibility="{Binding CanInstallUnityRenoDx, Converter={StaticResource BoolToVis}}"/>
                         </StackPanel>
                     </StackPanel>
@@ -98,9 +98,9 @@
                         <TextBlock Text="Luma" Style="{StaticResource SectionTitle}"/>
                         <TextBlock Text="{Binding LumaStatus}" Style="{StaticResource SectionStatus}"/>
                         <StackPanel Orientation="Horizontal">
-                            <Button Content="Install" Command="{Binding LumaInstallCommand}"/>
-                            <Button Content="Check update" Command="{Binding LumaUpdateCommand}"/>
-                            <Button Content="Uninstall" Command="{Binding LumaUninstallCommand}"/>
+                            <Button Content="Install" Command="{Binding LumaInstallCommand}" AutomationProperties.AutomationId="LumaInstall"/>
+                            <Button Content="Check update" Command="{Binding LumaUpdateCommand}" AutomationProperties.AutomationId="LumaCheckUpdate"/>
+                            <Button Content="Uninstall" Command="{Binding LumaUninstallCommand}" AutomationProperties.AutomationId="LumaUninstall"/>
                         </StackPanel>
                     </StackPanel>
                 </Border>
@@ -111,10 +111,10 @@
                         <TextBlock Text="{Binding DxvkStatus}" Style="{StaticResource SectionStatus}"/>
                         <TextBlock Text="{Binding DxvkApiDetectionText}" Style="{StaticResource SectionStatus}"/>
                         <StackPanel Orientation="Horizontal">
-                            <Button Content="Install (DX8/DX9/DX10)" Command="{Binding DxvkInstallCommand}"
+                            <Button Content="Install (DX8/DX9/DX10)" Command="{Binding DxvkInstallCommand}" AutomationProperties.AutomationId="DxvkInstall"
                                     IsEnabled="{Binding CanInstallDxvk}" Visibility="{Binding ShowDxvkInstallButton, Converter={StaticResource BoolToVis}}"/>
-                            <Button Content="Check update" Command="{Binding DxvkUpdateCommand}"/>
-                            <Button Content="Uninstall" Command="{Binding DxvkUninstallCommand}"/>
+                            <Button Content="Check update" Command="{Binding DxvkUpdateCommand}" AutomationProperties.AutomationId="DxvkCheckUpdate"/>
+                            <Button Content="Uninstall" Command="{Binding DxvkUninstallCommand}" AutomationProperties.AutomationId="DxvkUninstall"/>
                         </StackPanel>
                     </StackPanel>
                 </Border>
@@ -124,12 +124,12 @@
                         <TextBlock Text="OptiScaler (AMD)" Style="{StaticResource SectionTitle}"/>
                         <TextBlock Text="{Binding OptiScalerStatus}" Style="{StaticResource SectionStatus}"/>
                         <StackPanel Orientation="Horizontal">
-                            <Button Content="Install (DLSS-only game)" Command="{Binding OptiScalerInstallDlssCommand}"/>
-                            <Button Content="Install (has FSR/XeSS)" Command="{Binding OptiScalerInstallNoDlssCommand}"/>
+                            <Button Content="Install (DLSS-only game)" Command="{Binding OptiScalerInstallDlssCommand}" AutomationProperties.AutomationId="OptiScalerInstallDlss"/>
+                            <Button Content="Install (has FSR/XeSS)" Command="{Binding OptiScalerInstallNoDlssCommand}" AutomationProperties.AutomationId="OptiScalerInstallNoDlss"/>
                         </StackPanel>
                         <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
-                            <Button Content="Check update" Command="{Binding OptiScalerUpdateCommand}"/>
-                            <Button Content="Uninstall" Command="{Binding OptiScalerUninstallCommand}"/>
+                            <Button Content="Check update" Command="{Binding OptiScalerUpdateCommand}" AutomationProperties.AutomationId="OptiScalerCheckUpdate"/>
+                            <Button Content="Uninstall" Command="{Binding OptiScalerUninstallCommand}" AutomationProperties.AutomationId="OptiScalerUninstall"/>
                         </StackPanel>
                     </StackPanel>
                 </Border>
