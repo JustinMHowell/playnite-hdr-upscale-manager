@@ -51,6 +51,23 @@ namespace HdrUpscaleManager.Services.Addons
 
         private static readonly HttpClient Http = CreateHttpClient();
 
+        /* Maps the game's detected/overridden graphics API to the dgVoodoo2 proxy DLL that wraps
+           it — null if dgVoodoo2 doesn't cover that API at all (D3D10+, Vulkan, OpenGL). Pure and
+           static so a regression here (e.g. a wrong API-to-DLL mapping) is caught by a fast unit
+           test instead of only surfacing as "Vanquish silently doesn't work" after a live run. */
+        public static string ResolveDllName(GraphicsApi api)
+        {
+            switch (api)
+            {
+                case GraphicsApi.D3D8: return "D3D8.dll";
+                case GraphicsApi.D3D9: return "D3D9.dll";
+                default: return null;
+            }
+        }
+
+        /* dgVoodoo2's own release zip ships separate MS/x86 and MS/x64 folders per DLL. */
+        public static string ResolveBitnessFolder(bool is64Bit) => is64Bit ? "x64" : "x86";
+
         public static async Task<Dgvoodoo2InstallResult> InstallAsync(string gameInstallPath, string cacheDirectory, GraphicsApi? apiOverride = null)
         {
             var exePath = PeInspector.FindGameExecutable(gameInstallPath);
@@ -64,14 +81,9 @@ namespace HdrUpscaleManager.Services.Addons
             var deployDir = Path.GetDirectoryName(exePath) ?? gameInstallPath;
 
             var api = apiOverride ?? info.Api;
-            string dllName;
-            switch (api)
-            {
-                case GraphicsApi.D3D8: dllName = "D3D8.dll"; break;
-                case GraphicsApi.D3D9: dllName = "D3D9.dll"; break;
-                default:
-                    return Fail($"dgVoodoo2 isn't offered for {api} — it only wraps DirectDraw/Direct3D up to version 9.");
-            }
+            var dllName = ResolveDllName(api);
+            if (dllName == null)
+                return Fail($"dgVoodoo2 isn't offered for {api} — it only wraps DirectDraw/Direct3D up to version 9.");
 
             var release = await GetLatestReleaseAsync().ConfigureAwait(false);
             if (release == null) return Fail("Could not determine the latest dgVoodoo2 release.");
@@ -96,7 +108,7 @@ namespace HdrUpscaleManager.Services.Addons
 
             // Zip layout confirmed live 2026-08-09 (v2.87.3): MS/x86/D3D9.dll, MS/x64/D3D9.dll,
             // MS/x86/D3D8.dll, dgVoodoo.conf at the archive root.
-            var bitnessFolder = info.Is64Bit ? "x64" : "x86";
+            var bitnessFolder = ResolveBitnessFolder(info.Is64Bit);
             var sourceDllPath = Path.Combine(extractDir, "MS", bitnessFolder, dllName);
             if (!File.Exists(sourceDllPath))
                 return Fail($"Extracted dgVoodoo2 archive is missing MS/{bitnessFolder}/{dllName}.");
