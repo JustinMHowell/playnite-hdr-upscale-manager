@@ -22,6 +22,10 @@ namespace HdrUpscaleManager.Models.Addons
         public Dictionary<string, OptiScalerCompatEntry> Fsr4Compat { get; set; } =
             new Dictionary<string, OptiScalerCompatEntry>(StringComparer.OrdinalIgnoreCase);
 
+        /* Gates OptiScalerWikiService.FetchAsync's own re-fetch — a wiki that only changes as
+           games get patched doesn't need hitting GitHub every time a manager window opens. */
+        public DateTime FetchedAtUtc { get; set; }
+
         /* Json.NET replaces these dictionaries with fresh, default-comparer instances during
            deserialization regardless of the property initializer above — same gap
            RemoteManifest.Normalize exists to close. Only needed after reading the on-disk cache

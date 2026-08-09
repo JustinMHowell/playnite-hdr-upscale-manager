@@ -1,13 +1,28 @@
+using System;
 using System.Collections.Generic;
+using System.IO;
 using HdrUpscaleManager.Models;
 using HdrUpscaleManager.Models.Addons;
 using HdrUpscaleManager.Services.Addons;
+using Newtonsoft.Json;
 using Xunit;
 
 namespace HdrUpscaleManager.Tests
 {
-    public class OptiScalerWikiServiceTests
+    public class OptiScalerWikiServiceTests : IDisposable
     {
+        private readonly string directory = Path.Combine(Path.GetTempPath(), "hdrum-tests-" + Guid.NewGuid());
+
+        public OptiScalerWikiServiceTests()
+        {
+            Directory.CreateDirectory(directory);
+        }
+
+        public void Dispose()
+        {
+            if (Directory.Exists(directory)) Directory.Delete(directory, recursive: true);
+        }
+
         // Matches the real wiki table shape: Game Name | Working | FSR4 | Upscalers | Notes | Screenshots.
         private const string SampleHtml = @"
             <table>
@@ -110,6 +125,36 @@ namespace HdrUpscaleManager.Tests
         }
 
         [Fact]
+        public void ParseCompatibilityPage_DifferentColumnOrder_StillFindsUpscalersByHeaderText()
+        {
+            // Regression for a real bug caught live 2026-08-09: the actual wiki page's column
+            // order (Game, Compatibility, Upscaler Inputs, OptiPatcher Support, Notes,
+            // Screenshots) doesn't match the fixed index this originally assumed from RHI's own
+            // source comment (Game, Working, FSR4, Upscalers, Notes, Screenshots) — a real fetch
+            // against Deep Rock Galactic returned "✨" (the OptiPatcher marker) instead of its
+            // real upscaler list. Header-text lookup must resolve the right column regardless of
+            // position.
+            const string html = @"
+                <table>
+                    <tr><th>Game</th><th>Compatibility</th><th>Upscaler Inputs</th><th>OptiPatcher Support</th><th>Notes</th><th>Screenshots</th></tr>
+                    <tr>
+                        <td>Deep Rock Galactic</td>
+                        <td>✔️</td>
+                        <td>DLSS, FSR2</td>
+                        <td>✨</td>
+                        <td>Some note</td>
+                        <td></td>
+                    </tr>
+                </table>";
+
+            var entries = Parse(html);
+
+            Assert.True(entries.TryGetValue("Deep Rock Galactic", out var entry));
+            Assert.Equal(new[] { "DLSS", "FSR2" }, entry.Upscalers);
+            Assert.Equal("Some note", entry.Notes);
+        }
+
+        [Fact]
         public void ResolveWikiName_NoOverride_ReturnsOriginalName()
         {
             var result = OptiScalerWikiService.ResolveWikiName("Control Ultimate Edition", manifest: null);
@@ -147,6 +192,32 @@ namespace HdrUpscaleManager.Tests
             var result = OptiScalerWikiService.ResolveWikiName("Some Game", manifest);
 
             Assert.Equal("Some Game", result);
+        }
+
+        // ── Disk cache (FetchAsync's 24h gate) ──────────────────────────────────
+
+        [Fact]
+        public void TryGetCachedData_RoundTripsFetchedAtUtcAndEntries()
+        {
+            var fetchedAt = new DateTime(2026, 8, 9, 12, 0, 0, DateTimeKind.Utc);
+            var onDisk = new OptiScalerWikiData { FetchedAtUtc = fetchedAt };
+            onDisk.StandardCompat["Control"] = new OptiScalerCompatEntry { GameName = "Control", Upscalers = new List<string> { "DLSS" } };
+            File.WriteAllText(Path.Combine(directory, "optiscaler_wiki_cache.json"), JsonConvert.SerializeObject(onDisk));
+
+            var loaded = new OptiScalerWikiService(directory).TryGetCachedData();
+
+            Assert.NotNull(loaded);
+            Assert.Equal(fetchedAt, loaded.FetchedAtUtc);
+            Assert.True(loaded.StandardCompat.TryGetValue("control", out var entry)); // case-insensitive
+            Assert.Equal(new[] { "DLSS" }, entry.Upscalers);
+        }
+
+        [Fact]
+        public void TryGetCachedData_NoCacheFileYet_ReturnsNull()
+        {
+            var loaded = new OptiScalerWikiService(directory).TryGetCachedData();
+
+            Assert.Null(loaded);
         }
     }
 }

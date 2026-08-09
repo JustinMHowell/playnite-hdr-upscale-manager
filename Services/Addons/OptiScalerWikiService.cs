@@ -26,6 +26,7 @@ namespace HdrUpscaleManager.Services.Addons
         private const string WikiBaseUrl = "https://github.com/optiscaler/OptiScaler/wiki/";
 
         private static readonly HttpClient Http = new HttpClient();
+        private static readonly TimeSpan CacheLifetime = TimeSpan.FromHours(24);
 
         private readonly string cacheFilePath;
 
@@ -56,13 +57,17 @@ namespace HdrUpscaleManager.Services.Addons
 
         public async Task<OptiScalerWikiData> FetchAsync()
         {
+            var cached = TryGetCachedData();
+            if (cached != null && DateTime.UtcNow - cached.FetchedAtUtc < CacheLifetime)
+                return cached;
+
             var standardHtml = await FetchPageSafeAsync(CompatibilityListUrl).ConfigureAwait(false);
             var fsr4Html = await FetchPageSafeAsync(Fsr4CompatibilityListUrl).ConfigureAwait(false);
 
             if (standardHtml == null && fsr4Html == null)
-                return TryGetCachedData();
+                return cached; // Network failed — an older cache is still better than nothing.
 
-            var data = new OptiScalerWikiData();
+            var data = new OptiScalerWikiData { FetchedAtUtc = DateTime.UtcNow };
             if (standardHtml != null) ParseCompatibilityPage(standardHtml, data.StandardCompat);
             if (fsr4Html != null) ParseCompatibilityPage(fsr4Html, data.Fsr4Compat);
 
@@ -95,8 +100,6 @@ namespace HdrUpscaleManager.Services.Addons
             }
         }
 
-        /* Table shape observed on both wiki pages: Game Name | Working | FSR4 | Upscalers |
-           Notes | Screenshots — some rows have fewer cells, handled defensively below. */
         internal static void ParseCompatibilityPage(string html, Dictionary<string, OptiScalerCompatEntry> entries)
         {
             var doc = new HtmlDocument();
@@ -111,10 +114,19 @@ namespace HdrUpscaleManager.Services.Addons
             }
         }
 
+        private class ColumnIndexes
+        {
+            public int Upscalers = 3;
+            public int Notes = 4;
+        }
+
         internal static void ParseTable(HtmlNode table, Dictionary<string, OptiScalerCompatEntry> entries)
         {
             var rows = table.SelectNodes(".//tr");
             if (rows == null || rows.Count < 2) return;
+
+            var headerRow = rows.FirstOrDefault(r => (r.SelectNodes("th")?.Count ?? 0) > 0);
+            var columns = ResolveColumnIndexes(headerRow);
 
             var dataRows = rows.Where(r => (r.SelectNodes("th")?.Count ?? 0) == 0);
 
@@ -122,7 +134,7 @@ namespace HdrUpscaleManager.Services.Addons
             {
                 try
                 {
-                    ParseRow(row, entries);
+                    ParseRow(row, columns, entries);
                 }
                 catch (Exception ex)
                 {
@@ -131,7 +143,29 @@ namespace HdrUpscaleManager.Services.Addons
             }
         }
 
-        private static void ParseRow(HtmlNode row, Dictionary<string, OptiScalerCompatEntry> entries)
+        /* Locates the "Upscalers"/"Upscaler Inputs" and "Notes" columns by their header text
+           instead of a fixed index — confirmed live 2026-08-09 that the wiki's actual column
+           order (Game, Compatibility, Upscaler Inputs, OptiPatcher Support, Notes, Screenshots)
+           doesn't match a hardcoded index 3 (that landed on the OptiPatcher-support marker "✨"
+           instead of the real upscaler list for Deep Rock Galactic). Falls back to indexes 3/4
+           if no header row is found at all. */
+        private static ColumnIndexes ResolveColumnIndexes(HtmlNode headerRow)
+        {
+            var result = new ColumnIndexes();
+            var headers = headerRow?.SelectNodes("th");
+            if (headers == null) return result;
+
+            for (var i = 0; i < headers.Count; i++)
+            {
+                var text = Clean(headers[i].InnerText);
+                if (text.IndexOf("upscaler", StringComparison.OrdinalIgnoreCase) >= 0) result.Upscalers = i;
+                else if (text.IndexOf("note", StringComparison.OrdinalIgnoreCase) >= 0) result.Notes = i;
+            }
+
+            return result;
+        }
+
+        private static void ParseRow(HtmlNode row, ColumnIndexes columns, Dictionary<string, OptiScalerCompatEntry> entries)
         {
             var cells = row.SelectNodes("td");
             if (cells == null || cells.Count < 2) return;
@@ -145,11 +179,11 @@ namespace HdrUpscaleManager.Services.Addons
             var statusText = cells.Count > 1 ? cells[1].InnerText : "";
             var status = statusText.Contains("✔") ? "Working" : statusText.Contains("❌") ? "Not Working" : "Unknown";
 
-            var upscalers = cells.Count > 3
-                ? Clean(cells[3].InnerText).Split(',').Select(s => s.Trim()).Where(s => s.Length > 0).ToList()
+            var upscalers = cells.Count > columns.Upscalers
+                ? Clean(cells[columns.Upscalers].InnerText).Split(',').Select(s => s.Trim()).Where(s => s.Length > 0).ToList()
                 : new List<string>();
 
-            var notes = cells.Count > 4 ? Clean(cells[4].InnerText) : null;
+            var notes = cells.Count > columns.Notes ? Clean(cells[columns.Notes].InnerText) : null;
             if (string.IsNullOrWhiteSpace(notes)) notes = null;
 
             // First occurrence wins — one row per game on the real wiki tables.
