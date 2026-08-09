@@ -63,6 +63,22 @@ namespace HdrUpscaleManager.UiTests
             return contents;
         }
 
+        /* For cases with no log file to watch (e.g. the OS HDR toggle — it writes nothing to
+           disk at all) — waits a fixed duration instead of polling for a settle signal, then
+           kills the same way LaunchWaitForLogsThenKill does. */
+        public static void LaunchWaitFixedThenKill(string gameId, string gameInstallDirectory, TimeSpan waitDuration, ITestOutputHelper output)
+        {
+            var pidsBeforeLaunch = new HashSet<int>(Process.GetProcesses().Select(p => p.Id));
+
+            output.WriteLine($"Launching game via playnite://playnite/start/{gameId}");
+            Process.Start(new ProcessStartInfo($"playnite://playnite/start/{gameId}") { UseShellExecute = true });
+
+            output.WriteLine($"Waiting a fixed {waitDuration.TotalSeconds}s for the game to start (no log file to watch for this case).");
+            Thread.Sleep(waitDuration);
+
+            KillNewGameProcesses(gameInstallDirectory, pidsBeforeLaunch, output);
+        }
+
         private static void WaitForLogsToSettle(string[] logPaths, TimeSpan timeout, ITestOutputHelper output)
         {
             var deadline = DateTime.UtcNow.Add(timeout);
