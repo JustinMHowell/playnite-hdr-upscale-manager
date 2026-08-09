@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "prerequisites": {
+    "Vanquish": [
+      {
+        "type": "dgvoodoo2",
+        "reason": "Vanquish never shipped a DirectX 11 renderer, but Luma's shader hooks only target DX11 — dgVoodoo2 wraps its native DirectX 9 up to a real DX11 device so Luma can attach at all."
+      }
+    ]
+  }
+}

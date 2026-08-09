@@ -53,6 +53,14 @@
     <EmbeddedResource Include="Resources\OptiScaler.ini.template">
       <LogicalName>HdrUpscaleManager.Resources.OptiScaler.ini.template</LogicalName>
     </EmbeddedResource>
+
+    <!-- Snapshot of the repo-root luma_prerequisites.json (our own data, not a third-party
+         redistribution) — used only as a last-resort fallback by LumaPrerequisitesManifestService
+         when neither a live fetch nor a local disk cache is available yet. Keep in sync with the
+         root copy by hand; it's a small, rarely-changing file. -->
+    <EmbeddedResource Include="Resources\luma_prerequisites.json">
+      <LogicalName>HdrUpscaleManager.Resources.luma_prerequisites.json</LogicalName>
+    </EmbeddedResource>
   </ItemGroup>
 
   <ItemGroup>

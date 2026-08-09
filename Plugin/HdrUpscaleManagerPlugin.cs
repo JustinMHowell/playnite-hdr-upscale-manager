@@ -60,6 +60,18 @@ namespace HdrUpscaleManager.Plugin
             {
                 Log.Error(ex, "Startup manifest refresh failed.");
             }
+
+            try
+            {
+                var result = await new Services.Addons.LumaPrerequisitesManifestService(GetPluginUserDataPath()).FetchAsync();
+                Log.Info(result?.Manifest != null
+                    ? $"Startup Luma prerequisites manifest refresh: source={result.Source}, version={result.Manifest.Version}."
+                    : "Startup Luma prerequisites manifest refresh: no network and nothing cached/bundled.");
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "Startup Luma prerequisites manifest refresh failed.");
+            }
         }
 
         public override IEnumerable<MainMenuItem> GetMainMenuItems(GetMainMenuItemsArgs args)

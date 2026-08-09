@@ -48,6 +48,7 @@ namespace HdrUpscaleManager.UI
            staying Unknown for "can't tell at all". See ShowDxvkSection. */
         private bool wikiConfidentlyAboveDxvkRange;
         private readonly RemoteManifest cachedManifest;
+        private readonly LumaPrerequisitesManifest lumaPrerequisitesManifest;
         private OptiScalerWikiData optiScalerWikiData;
         private bool optiScalerWikiLookupInProgress;
 
@@ -115,6 +116,14 @@ namespace HdrUpscaleManager.UI
         private string lumaStatus;
         public string LumaStatus { get => lumaStatus; private set => SetProperty(ref lumaStatus, value); }
 
+        /* dgVoodoo2 has no manual install/uninstall surface of its own — it's purely an
+           automatic prerequisite step InstallLumaAsync runs first for whichever games the Luma
+           prerequisites manifest lists (Vanquish today), the same way ReShade auto-installs
+           ahead of RenoDX (EnsureReShadeInstalledForRenoDxAsync). Still tracked via
+           Dgvoodoo2Records so a second Luma install/reinstall doesn't redundantly reinstall it. */
+        private List<LumaPrerequisiteStep> Dgvoodoo2Steps =>
+            lumaPrerequisitesManifest?.GetStepsFor(GameName)?.FindAll(s => s.Type == "dgvoodoo2") ?? new List<LumaPrerequisiteStep>();
+
         private string dxvkStatus;
         public string DxvkStatus { get => dxvkStatus; private set => SetProperty(ref dxvkStatus, value); }
 
@@ -176,6 +185,7 @@ namespace HdrUpscaleManager.UI
             Game = game;
 
             cachedManifest = new ManifestService(userDataPath).TryGetCachedManifest();
+            lumaPrerequisitesManifest = new LumaPrerequisitesManifestService(userDataPath).TryGetCachedManifest();
             detectedRenoDxEngine = RenoDxEngineDetector.Detect(
                 Game.InstallDirectory, GameName, cachedManifest?.InstallPathOverrides, cachedManifest?.EngineHintOverrides).Engine;
 
@@ -342,6 +352,7 @@ namespace HdrUpscaleManager.UI
 
         private JsonRecordStore<RenoDxInstalledRecord> RenoDxRecords => new JsonRecordStore<RenoDxInstalledRecord>(userDataPath, "renodx_installs.json");
         private JsonRecordStore<LumaInstalledRecord> LumaRecords => new JsonRecordStore<LumaInstalledRecord>(userDataPath, "luma_installs.json");
+        private JsonRecordStore<Dgvoodoo2InstalledRecord> Dgvoodoo2Records => new JsonRecordStore<Dgvoodoo2InstalledRecord>(userDataPath, "dgvoodoo2_installs.json");
         private JsonRecordStore<DxvkInstalledRecord> DxvkRecords => new JsonRecordStore<DxvkInstalledRecord>(userDataPath, "dxvk_installs.json");
         private JsonRecordStore<OptiScalerInstalledRecord> OptiScalerRecords => new JsonRecordStore<OptiScalerInstalledRecord>(userDataPath, "optiscaler_installs.json");
 
@@ -353,7 +364,10 @@ namespace HdrUpscaleManager.UI
             RenoDxStatus = renoDx != null ? $"Installed ({renoDx.MatchedWikiName ?? renoDx.AddonFileName})" : "Not installed.";
 
             var luma = LumaRecords.Get(GameId);
-            LumaStatus = luma != null ? $"Installed (build {luma.InstalledBuildNumber})" : "Not installed.";
+            var dgvoodoo2 = Dgvoodoo2Records.Get(GameId);
+            LumaStatus = luma != null
+                ? $"Installed (build {luma.InstalledBuildNumber})" + (dgvoodoo2 != null ? $" + dgVoodoo2 {dgvoodoo2.Version}" : "")
+                : "Not installed.";
 
             var dxvk = DxvkRecords.Get(GameId);
             DxvkStatus = dxvk != null ? $"Installed ({dxvk.Version}, {string.Join("+", dxvk.InstalledDlls)})" : "Not installed.";
@@ -715,6 +729,8 @@ namespace HdrUpscaleManager.UI
             StatusText = "Installing Luma (matched game)…";
             try
             {
+                if (!await EnsureDgvoodoo2InstalledForLumaAsync().ConfigureAwait(true)) return;
+
                 var manifestResult = await new ManifestService(userDataPath).FetchAsync().ConfigureAwait(true);
                 var manifest = manifestResult?.Manifest;
 
@@ -747,13 +763,60 @@ namespace HdrUpscaleManager.UI
                     InstalledAtUtc = DateTimeOffset.UtcNow
                 });
 
-                StatusText = $"Installed Luma ({result.MatchedGameName})." + (result.Notes != null ? $" Note: {result.Notes}" : "");
+                var dgvoodoo2Note = Dgvoodoo2Records.Get(GameId) != null ? " Also installed dgVoodoo2, a required prerequisite for this game." : "";
+                StatusText = $"Installed Luma ({result.MatchedGameName})." + (result.Notes != null ? $" Note: {result.Notes}" : "") + dgvoodoo2Note;
             }
             catch (Exception ex)
             {
                 Log.Error(ex, $"Luma install failed for '{GameName}'.");
                 StatusText = $"Luma install failed: {ex.Message}";
                 api.Dialogs.ShowErrorMessage(StatusText, "Install Luma");
+            }
+        }
+
+        /* Same shape as EnsureReShadeInstalledForRenoDxAsync — runs before the real Luma install
+           whenever the Luma prerequisites manifest lists a "dgvoodoo2" step for this game
+           (Vanquish today; see luma_prerequisites.json). Already-installed is a no-op, not a
+           reinstall. Only aborts the Luma install if this actually fails; if the game has no
+           listed prerequisite at all, this is an instant no-op. */
+        private async Task<bool> EnsureDgvoodoo2InstalledForLumaAsync()
+        {
+            if (Dgvoodoo2Steps.Count == 0) return true;
+            if (Dgvoodoo2Records.Get(GameId) != null) return true;
+
+            try
+            {
+                if (KnownDxvkApiOrNull == null) await EnsurePcGamingWikiLookupCompletedAsync().ConfigureAwait(true);
+
+                var cacheDir = Path.Combine(userDataPath, "Dgvoodoo2Cache");
+                var result = await Dgvoodoo2Service.InstallAsync(Game.InstallDirectory, cacheDir, KnownDxvkApiOrNull).ConfigureAwait(true);
+                if (!result.Success)
+                {
+                    StatusText = $"Luma needs dgVoodoo2 installed first, and that failed: {result.Error}";
+                    api.Dialogs.ShowErrorMessage(StatusText, "Install Luma");
+                    return false;
+                }
+
+                Dgvoodoo2Records.Set(GameId, new Dgvoodoo2InstalledRecord
+                {
+                    GameId = GameId,
+                    GameName = GameName,
+                    InstallPath = result.DeployDirectory,
+                    InstalledFiles = result.InstalledFiles,
+                    BackedUpFiles = result.BackedUpFiles,
+                    Version = result.Version,
+                    InstalledAtUtc = DateTimeOffset.UtcNow
+                });
+
+                Log.Info($"Auto-installed dgVoodoo2 {result.Version} for '{GameName}' ahead of Luma.");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, $"Auto dgVoodoo2 install failed for '{GameName}' ahead of Luma.");
+                StatusText = $"Luma needs dgVoodoo2 installed first, and that failed: {ex.Message}";
+                api.Dialogs.ShowErrorMessage(StatusText, "Install Luma");
+                return false;
             }
         }
 
@@ -797,7 +860,7 @@ namespace HdrUpscaleManager.UI
                 }
 
                 LumaRecords.Remove(GameId);
-                StatusText = "Uninstalled Luma.";
+                StatusText = "Uninstalled Luma." + UninstallDgvoodoo2IfPresent();
             }
             catch (Exception ex)
             {
@@ -807,6 +870,35 @@ namespace HdrUpscaleManager.UI
             }
 
             await Task.CompletedTask;
+        }
+
+        /* Mirror of EnsureDgvoodoo2InstalledForLumaAsync on the way out — dgVoodoo2 was only ever
+           installed here as Luma's own prerequisite, not as something the user chose
+           independently, so uninstalling Luma should clean it up too rather than leaving it
+           behind as an orphaned, addon-tracked install. A failure here is logged but doesn't
+           turn the overall "Uninstall Luma" action into a failure — Luma itself is already gone. */
+        private string UninstallDgvoodoo2IfPresent()
+        {
+            var record = Dgvoodoo2Records.Get(GameId);
+            if (record == null) return "";
+
+            try
+            {
+                var result = Dgvoodoo2Service.Uninstall(record);
+                if (!result.Success)
+                {
+                    Log.Error($"dgVoodoo2 uninstall failed for '{GameName}': {result.Error}");
+                    return $" (Also tried to remove dgVoodoo2, but that failed: {result.Error})";
+                }
+
+                Dgvoodoo2Records.Remove(GameId);
+                return " Also removed dgVoodoo2.";
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, $"dgVoodoo2 uninstall failed for '{GameName}'.");
+                return $" (Also tried to remove dgVoodoo2, but that failed: {ex.Message})";
+            }
         }
 
         // ── DXVK+Lilium ──────────────────────────────────────────────────────────
