@@ -52,13 +52,26 @@ namespace HdrUpscaleManager.Services.ReShade
            gameInstallPath itself — a proxy DLL only loads from the same folder as the actual
            running exe, which can be a subfolder of gameInstallPath (confirmed live on Deep Rock
            Galactic 2026-08-09: FSD.exe at the root is a launcher stub, the real exe is
-           FSD\Binaries\Win64\FSD-Win64-Shipping.exe). */
+           FSD\Binaries\Win64\FSD-Win64-Shipping.exe).
+
+           Once OptiScaler is present, it claims the normal proxy name for itself, so a file
+           existing there is OptiScaler's own, not ReShade's — checking it anyway is a false
+           positive. Confirmed live 2026-08-09: this exact ambiguity made
+           EnsureReShadeInstalledForRenoDxAsync think ReShade was already installed for Deep Rock
+           Galactic (OptiScaler's own dxgi.dll satisfied the naive existence check) and skip
+           installing it at all, leaving RenoDX's addon with no real host to load it. Once
+           OptiScaler is confirmed present, ReShadeCoexistName is the only name that can actually
+           mean ReShade. */
         public static bool IsInstalled(string gameInstallPath, GraphicsApi? apiOverride = null)
         {
             var exePath = PeInspector.FindGameExecutable(gameInstallPath);
             if (exePath == null) return false;
 
             var deployDir = Path.GetDirectoryName(exePath) ?? gameInstallPath;
+
+            if (OptiScalerService.IsInstalled(deployDir))
+                return File.Exists(Path.Combine(deployDir, OptiScalerService.ReShadeCoexistName));
+
             var api = apiOverride ?? PeInspector.Inspect(exePath)?.Api;
             var proxyDllName = api != null ? ReShadeProxyDll.GetProxyDllName(api.Value) : null;
             if (proxyDllName != null && File.Exists(Path.Combine(deployDir, proxyDllName)))

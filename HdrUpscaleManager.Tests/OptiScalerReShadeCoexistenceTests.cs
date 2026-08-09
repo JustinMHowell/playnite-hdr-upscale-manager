@@ -78,6 +78,31 @@ namespace HdrUpscaleManager.Tests
             Assert.False(ReShadeInstallService.IsInstalled(directory, GraphicsApi.D3D11));
         }
 
+        [Fact]
+        public void ReShadeIsInstalled_OptiScalerPresentButOnlyItsOwnDxgiDllExists_ReturnsFalse()
+        {
+            // Regression for the bug confirmed live 2026-08-09 on Deep Rock Galactic:
+            // EnsureReShadeInstalledForRenoDxAsync thought ReShade was already installed because
+            // OptiScaler's own dxgi.dll satisfied the naive proxy-name existence check, so it
+            // never actually installed ReShade — RenoDX's addon was left with no real host.
+            // Once OptiScaler is confirmed present, a file at the plain proxy name is its own,
+            // not ReShade's — only ReShadeCoexistName can mean ReShade at that point.
+            WriteFile("OptiScaler.ini");
+            WriteFile("dxgi.dll"); // OptiScaler's own file, not ReShade's
+
+            Assert.False(ReShadeInstallService.IsInstalled(directory, GraphicsApi.D3D11));
+        }
+
+        [Fact]
+        public void ReShadeIsInstalled_OptiScalerPresentAndCoexistNameExists_ReturnsTrue()
+        {
+            WriteFile("OptiScaler.ini");
+            WriteFile("dxgi.dll"); // OptiScaler's own file
+            WriteFile(OptiScalerService.ReShadeCoexistName); // ReShade, correctly displaced
+
+            Assert.True(ReShadeInstallService.IsInstalled(directory, GraphicsApi.D3D11));
+        }
+
         // ── Scenario: OptiScaler already installed, then the user installs ReShade ──
 
         [Fact]
