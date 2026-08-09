@@ -52,6 +52,10 @@ namespace HdrUpscaleManager.Services.Addons
         private const string DlssManifestUrl = "https://raw.githubusercontent.com/beeradmoore/dlss-swapper-manifest-builder/main/manifest.json";
         private const string IniResourceName = "HdrUpscaleManager.Resources.OptiScaler.ini.template";
 
+        /* Fixed filename OptiScaler's own LoadReshade setting looks for (see DeployIni) — RHI
+           uses this same literal name regardless of the game's bitness. */
+        public const string ReShadeCoexistName = "ReShade64.dll";
+
         private static readonly HashSet<string> SkipTopLevelFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
             "version.txt", "OptiScaler.dll", "OptiScaler.ini"
@@ -73,6 +77,12 @@ namespace HdrUpscaleManager.Services.Addons
             /* dxgi.dll won't load under Vulkan — the one vendor-agnostic auto-override RHI applies. */
             return api == GraphicsApi.Vulkan ? "winmm.dll" : "dxgi.dll";
         }
+
+        /* OptiScaler.ini is always deployed under this exact literal name (see DeployIni) and
+           never renamed, unlike OptiScaler.dll itself — the one reliable file-based marker that
+           doesn't depend on which proxy DLL name was chosen for this game. */
+        public static bool IsInstalled(string gameInstallPath) =>
+            File.Exists(Path.Combine(gameInstallPath, "OptiScaler.ini"));
 
         public static async Task<OptiScalerInstallResult> InstallAsync(
             string gameInstallPath,
@@ -115,6 +125,13 @@ namespace HdrUpscaleManager.Services.Addons
 
             var dllName = ResolveDllName(gameName, info.Api, manifest);
             var installedFiles = new List<string>();
+
+            /* OptiScaler and ReShade can't both claim the same proxy DLL name. If ReShade is
+               already sitting in the slot OptiScaler wants, move it to the fixed name
+               OptiScaler's own LoadReshade setting expects (see DeployIni) instead of letting
+               FileBackup treat it as "the game's original file" and back it up/clobber it. */
+            if (ShouldDisplaceReShade(gameInstallPath, dllName, info.Api))
+                MoveReShadeToCoexistName(gameInstallPath, dllName);
 
             try
             {
@@ -174,6 +191,65 @@ namespace HdrUpscaleManager.Services.Addons
             };
         }
 
+        /* True when ReShade is already installed under the exact proxy name OptiScaler is about
+           to claim for itself — the one case that actually needs the coexistence dance below. */
+        internal static bool ShouldDisplaceReShade(string gameInstallPath, string dllName, GraphicsApi api)
+        {
+            var reShadeProxyName = ReShadeProxyDll.GetProxyDllName(api);
+            return string.Equals(reShadeProxyName, dllName, StringComparison.OrdinalIgnoreCase) &&
+                ReShadeInstallService.IsInstalled(gameInstallPath, api);
+        }
+
+        internal static void MoveReShadeToCoexistName(string gameInstallPath, string reShadeCurrentName)
+        {
+            var currentPath = Path.Combine(gameInstallPath, reShadeCurrentName);
+            var coexistPath = Path.Combine(gameInstallPath, ReShadeCoexistName);
+            if (!File.Exists(currentPath) || File.Exists(coexistPath)) return;
+
+            try
+            {
+                File.Move(currentPath, coexistPath);
+                Log.Info($"Moved ReShade '{reShadeCurrentName}' to '{ReShadeCoexistName}' so OptiScaler can use '{reShadeCurrentName}'.");
+            }
+            catch (Exception ex)
+            {
+                Log.Warn(ex, $"Failed to move ReShade out of the way at '{currentPath}' — OptiScaler install will back it up instead.");
+            }
+        }
+
+        /* Undoes MoveReShadeToCoexistName (or a ReShade install that deployed straight to the
+           coexist name because OptiScaler was already present) — moves ReShade back to its
+           normal proxy name now that OptiScaler's own file is gone. Leaves it as
+           ReShadeCoexistName if that name is occupied by something else; still functional via
+           LoadReshade, just not renamed back.
+
+           restoreName is record.DllName rather than a fresh PE re-inspection: coexistence only
+           ever triggers when ReShade's proxy name matches OptiScaler's own resolved dllName (see
+           InstallAsync and ReShadeInstallService.InstallAsync), so the slot OptiScaler is about
+           to vacate is always the correct name to hand ReShade back. */
+        internal static void RestoreReShadeFromCoexistName(string gameInstallPath, string restoreName)
+        {
+            var coexistPath = Path.Combine(gameInstallPath, ReShadeCoexistName);
+            if (!File.Exists(coexistPath) || string.IsNullOrEmpty(restoreName)) return;
+
+            var restorePath = Path.Combine(gameInstallPath, restoreName);
+            if (File.Exists(restorePath))
+            {
+                Log.Warn($"Can't restore ReShade to '{restoreName}' — occupied. Leaving it as '{ReShadeCoexistName}'.");
+                return;
+            }
+
+            try
+            {
+                File.Move(coexistPath, restorePath);
+                Log.Info($"Restored ReShade '{ReShadeCoexistName}' back to '{restoreName}'.");
+            }
+            catch (Exception ex)
+            {
+                Log.Warn(ex, $"Failed to restore ReShade from '{ReShadeCoexistName}' to '{restoreName}'.");
+            }
+        }
+
         private static void CopyDirectoryRecursive(string sourceDir, string destDir)
         {
             Directory.CreateDirectory(destDir);
@@ -196,6 +272,10 @@ namespace HdrUpscaleManager.Services.Addons
             content = ReplaceExactLine(content, "LoadReshade=auto", "LoadReshade=true");
             content = ReplaceExactLine(content, "LoadAsiPlugins=auto", "LoadAsiPlugins=true");
             content = ReplaceExactLine(content, "ShortcutKey=auto", "ShortcutKey=0x2D");
+            /* Off by default (see OptiScaler.ini's own LogToFile comment) — forced on so
+               OptiScaler.log exists to confirm a real launch actually loaded it (and, via
+               LoadReshade above, chain-loaded ReShade too). */
+            content = ReplaceExactLine(content, "LogToFile=auto", "LogToFile=true");
 
             File.WriteAllText(targetIniPath, content.Replace("\n", Environment.NewLine));
         }
@@ -348,6 +428,8 @@ namespace HdrUpscaleManager.Services.Addons
                     var dlssPath = Path.Combine(record.InstallPath, "nvngx_dlss.dll");
                     if (File.Exists(dlssPath)) File.Delete(dlssPath);
                 }
+
+                RestoreReShadeFromCoexistName(record.InstallPath, record.DllName);
 
                 Log.Info($"Uninstalled OptiScaler from '{record.GameName}'.");
                 return new OptiScalerUninstallResult { Success = true };

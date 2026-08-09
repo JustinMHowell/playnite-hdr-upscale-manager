@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Net.Http;
 using System.Threading.Tasks;
+using HdrUpscaleManager.Services.Addons;
 
 namespace HdrUpscaleManager.Services.ReShade
 {
@@ -39,7 +40,12 @@ namespace HdrUpscaleManager.Services.ReShade
 
            apiOverride (from RemoteManifest.GraphicsApiOverrides) skips PE import-table
            inspection for the API itself when the caller already knows it — see InstallAsync's
-           own doc comment for why that inspection can't be trusted alone. */
+           own doc comment for why that inspection can't be trusted alone.
+
+           Also checks OptiScalerService.ReShadeCoexistName — when OptiScaler is installed for
+           the same game, ReShade lives there instead of under its normal proxy name (see
+           InstallAsync below), and this needs to keep recognizing it as installed regardless
+           of which name it currently occupies. */
         public static bool IsInstalled(string gameInstallPath, GraphicsApi? apiOverride = null)
         {
             var exePath = PeInspector.FindGameExecutable(gameInstallPath);
@@ -47,8 +53,16 @@ namespace HdrUpscaleManager.Services.ReShade
 
             var api = apiOverride ?? PeInspector.Inspect(exePath)?.Api;
             var proxyDllName = api != null ? ReShadeProxyDll.GetProxyDllName(api.Value) : null;
-            return proxyDllName != null && File.Exists(Path.Combine(gameInstallPath, proxyDllName));
+            if (proxyDllName != null && File.Exists(Path.Combine(gameInstallPath, proxyDllName)))
+                return true;
+
+            return File.Exists(Path.Combine(gameInstallPath, OptiScalerService.ReShadeCoexistName));
         }
+
+        /* OptiScaler already claims proxyDllName for itself when present — deploy under the
+           fixed name its own LoadReshade setting looks for instead of colliding with it. */
+        internal static string ResolveTargetDllName(string gameInstallPath, string proxyDllName) =>
+            OptiScalerService.IsInstalled(gameInstallPath) ? OptiScalerService.ReShadeCoexistName : proxyDllName;
 
         /* Always installs whatever version reshade.me currently serves — there's no version
            picker yet, this will become configurable later.
@@ -75,6 +89,8 @@ namespace HdrUpscaleManager.Services.ReShade
             var proxyDllName = ReShadeProxyDll.GetProxyDllName(api);
             if (proxyDllName == null)
                 return Fail($"{api} isn't supported by a drop-in ReShade install.");
+
+            proxyDllName = ResolveTargetDllName(gameInstallPath, proxyDllName);
 
             var versionInfo = await ReShadeVersionChecker.CheckLatestAsync().ConfigureAwait(false);
             if (versionInfo == null)

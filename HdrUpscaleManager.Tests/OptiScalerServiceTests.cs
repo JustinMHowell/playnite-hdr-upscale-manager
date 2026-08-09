@@ -97,6 +97,15 @@ namespace HdrUpscaleManager.Tests
         }
 
         [Fact]
+        public void DeployIni_AlwaysForcesLogToFile_SoOptiScalerLogExistsAfterARealLaunch()
+        {
+            OptiScalerService.DeployIni(directory, dlssInputs: true);
+
+            var content = File.ReadAllText(Path.Combine(directory, "OptiScaler.ini"));
+            Assert.Contains("LogToFile=true", content);
+        }
+
+        [Fact]
         public void DeployIni_ExistingIniPresent_IsPreservedNotOverwritten()
         {
             var iniPath = Path.Combine(directory, "OptiScaler.ini");
