@@ -18,6 +18,11 @@ namespace HdrUpscaleManager.Services.Addons
         public bool Success { get; set; }
         public string Error { get; set; }
         public string DllName { get; set; }
+        /* The real directory files were deployed to — may differ from the gameInstallPath
+           InstallAsync was called with (see PeInspector.ResolveDeployDirectory). The caller must
+           store THIS as the record's InstallPath, not the original gameInstallPath, so Uninstall
+           later operates on the same directory. */
+        public string DeployDirectory { get; set; }
         public List<string> InstalledFiles { get; set; }
         public bool OptiPatcherInstalled { get; set; }
         public bool DlssDllInstalled { get; set; }
@@ -80,9 +85,12 @@ namespace HdrUpscaleManager.Services.Addons
 
         /* OptiScaler.ini is always deployed under this exact literal name (see DeployIni) and
            never renamed, unlike OptiScaler.dll itself — the one reliable file-based marker that
-           doesn't depend on which proxy DLL name was chosen for this game. */
+           doesn't depend on which proxy DLL name was chosen for this game. Resolves the real
+           deploy directory itself (see PeInspector.ResolveDeployDirectory) rather than assuming
+           gameInstallPath IS that directory — safe to call with either the raw Playnite install
+           root or an already-resolved deploy directory, since re-resolving the latter is a no-op. */
         public static bool IsInstalled(string gameInstallPath) =>
-            File.Exists(Path.Combine(gameInstallPath, "OptiScaler.ini"));
+            File.Exists(Path.Combine(PeInspector.ResolveDeployDirectory(gameInstallPath), "OptiScaler.ini"));
 
         public static async Task<OptiScalerInstallResult> InstallAsync(
             string gameInstallPath,
@@ -98,6 +106,12 @@ namespace HdrUpscaleManager.Services.Addons
 
             var info = PeInspector.Inspect(exePath);
             if (info == null) return Fail("Could not read the game executable's PE header.");
+
+            /* Deploy next to the real exe, not gameInstallPath itself — see
+               PeInspector.ResolveDeployDirectory's own doc comment for why (a launcher stub at
+               the install root and the real engine binary in a subfolder are two different
+               directories for DLL search-order purposes, confirmed live on Deep Rock Galactic). */
+            var deployDir = Path.GetDirectoryName(exePath) ?? gameInstallPath;
 
             var release = await GetLatestReleaseAsync().ConfigureAwait(false);
             if (release == null) return Fail("Could not determine the latest OptiScaler release.");
@@ -130,8 +144,8 @@ namespace HdrUpscaleManager.Services.Addons
                already sitting in the slot OptiScaler wants, move it to the fixed name
                OptiScaler's own LoadReshade setting expects (see DeployIni) instead of letting
                FileBackup treat it as "the game's original file" and back it up/clobber it. */
-            if (ShouldDisplaceReShade(gameInstallPath, dllName, info.Api))
-                MoveReShadeToCoexistName(gameInstallPath, dllName);
+            if (ShouldDisplaceReShade(deployDir, dllName, info.Api))
+                MoveReShadeToCoexistName(deployDir, dllName);
 
             try
             {
@@ -141,7 +155,7 @@ namespace HdrUpscaleManager.Services.Addons
                     if (SkipTopLevelFiles.Contains(name)) continue;
                     if (SkipTopLevelExtensions.Contains(Path.GetExtension(name))) continue;
 
-                    var destPath = Path.Combine(gameInstallPath, name);
+                    var destPath = Path.Combine(deployDir, name);
                     FileBackup.BackupIfNeeded(destPath);
                     File.Copy(filePath, destPath, overwrite: true);
                     installedFiles.Add(name);
@@ -152,11 +166,11 @@ namespace HdrUpscaleManager.Services.Addons
                     var dirName = Path.GetFileName(dirPath);
                     if (string.Equals(dirName, "Licenses", StringComparison.OrdinalIgnoreCase)) continue;
 
-                    CopyDirectoryRecursive(dirPath, Path.Combine(gameInstallPath, dirName));
+                    CopyDirectoryRecursive(dirPath, Path.Combine(deployDir, dirName));
                     installedFiles.Add(dirName + Path.DirectorySeparatorChar);
                 }
 
-                var targetDllPath = Path.Combine(gameInstallPath, dllName);
+                var targetDllPath = Path.Combine(deployDir, dllName);
                 FileBackup.BackupIfNeeded(targetDllPath);
                 File.Copy(Path.Combine(stagingRoot, "OptiScaler.dll"), targetDllPath, overwrite: true);
                 installedFiles.Add(dllName);
@@ -169,7 +183,7 @@ namespace HdrUpscaleManager.Services.Addons
 
             try
             {
-                if (DeployIni(gameInstallPath, dlssInputs))
+                if (DeployIni(deployDir, dlssInputs))
                     installedFiles.Add("OptiScaler.ini");
             }
             catch (Exception ex)
@@ -177,14 +191,15 @@ namespace HdrUpscaleManager.Services.Addons
                 Log.Warn(ex, "Failed to deploy OptiScaler.ini — OptiScaler will run with its built-in defaults.");
             }
 
-            var optiPatcherInstalled = installOptiPatcher && await TryInstallOptiPatcherAsync(gameInstallPath).ConfigureAwait(false);
-            var dlssDllInstalled = installDlssDll && await TryInstallDlssDllAsync(gameInstallPath, cacheDirectory).ConfigureAwait(false);
+            var optiPatcherInstalled = installOptiPatcher && await TryInstallOptiPatcherAsync(deployDir).ConfigureAwait(false);
+            var dlssDllInstalled = installDlssDll && await TryInstallDlssDllAsync(deployDir, cacheDirectory).ConfigureAwait(false);
 
-            Log.Info($"Installed OptiScaler {release.Version} ({dllName}) to '{gameInstallPath}'.");
+            Log.Info($"Installed OptiScaler {release.Version} ({dllName}) to '{deployDir}'.");
             return new OptiScalerInstallResult
             {
                 Success = true,
                 DllName = dllName,
+                DeployDirectory = deployDir,
                 InstalledFiles = installedFiles,
                 OptiPatcherInstalled = optiPatcherInstalled,
                 DlssDllInstalled = dlssDllInstalled,

@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Linq;
+using FlaUI.Core.AutomationElements;
 using FlaUI.Core.Tools;
 using Xunit;
 using Xunit.Abstractions;
@@ -64,15 +65,14 @@ namespace HdrUpscaleManager.UiTests
             {
                 ManagerSectionNavigation.ClickSectionButton(managerWindow, "ReShade", "Install latest", output);
 
-                reShadeProxyPath = WaitForReShadeInstall(gameInstallDirectory);
+                reShadeProxyPath = WaitForReShadeInstall(managerWindow, gameInstallDirectory);
                 output.WriteLine($"ReShade installed as '{reShadeProxyPath}'.");
 
                 managerWindow.Close();
                 managerWindow = null;
 
-                var gameExePath = Path.Combine(gameInstallDirectory, game.ExeFileName);
                 var logContents = GameLaunchAndLogCapture.LaunchWaitForLogsThenKill(
-                    game.GameId, gameInstallDirectory, gameExePath, new[] { "ReShade.log" }, output);
+                    game.GameId, gameInstallDirectory, new[] { "ReShade.log" }, output);
 
                 var reShadeLogPath = Path.Combine(gameInstallDirectory, "ReShade.log");
                 var content = logContents[reShadeLogPath];
@@ -94,7 +94,7 @@ namespace HdrUpscaleManager.UiTests
             }
         }
 
-        private string WaitForReShadeInstall(string gameInstallDirectory)
+        private string WaitForReShadeInstall(Window managerWindow, string gameInstallDirectory)
         {
             string found = null;
             var appeared = Retry.WhileFalse(
@@ -104,6 +104,7 @@ namespace HdrUpscaleManager.UiTests
 
             if (!appeared)
             {
+                WindowScreenshot.CaptureOnTimeout(managerWindow, nameof(InstallReShadeThenLaunch_RealGame_ReShadeLogAppearsAndLoads), output);
                 throw new InvalidOperationException(
                     $"None of {string.Join(", ", ReShadeProxyDllCandidates)} appeared in '{gameInstallDirectory}' " +
                     "within 30s of clicking 'Install latest' — the install may have failed. Check the manager " +

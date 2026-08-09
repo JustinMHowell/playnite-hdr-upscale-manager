@@ -12,6 +12,7 @@ namespace HdrUpscaleManager.Services.ReShade
         public bool Success { get; set; }
         public string Error { get; set; }
         public string InstalledDllPath { get; set; }
+        public string DeployDirectory { get; set; }
         public GraphicsApi Api { get; set; }
         public string Version { get; set; }
     }
@@ -45,18 +46,25 @@ namespace HdrUpscaleManager.Services.ReShade
            Also checks OptiScalerService.ReShadeCoexistName — when OptiScaler is installed for
            the same game, ReShade lives there instead of under its normal proxy name (see
            InstallAsync below), and this needs to keep recognizing it as installed regardless
-           of which name it currently occupies. */
+           of which name it currently occupies.
+
+           Checks the real deploy directory (see PeInspector.ResolveDeployDirectory), not
+           gameInstallPath itself — a proxy DLL only loads from the same folder as the actual
+           running exe, which can be a subfolder of gameInstallPath (confirmed live on Deep Rock
+           Galactic 2026-08-09: FSD.exe at the root is a launcher stub, the real exe is
+           FSD\Binaries\Win64\FSD-Win64-Shipping.exe). */
         public static bool IsInstalled(string gameInstallPath, GraphicsApi? apiOverride = null)
         {
             var exePath = PeInspector.FindGameExecutable(gameInstallPath);
             if (exePath == null) return false;
 
+            var deployDir = Path.GetDirectoryName(exePath) ?? gameInstallPath;
             var api = apiOverride ?? PeInspector.Inspect(exePath)?.Api;
             var proxyDllName = api != null ? ReShadeProxyDll.GetProxyDllName(api.Value) : null;
-            if (proxyDllName != null && File.Exists(Path.Combine(gameInstallPath, proxyDllName)))
+            if (proxyDllName != null && File.Exists(Path.Combine(deployDir, proxyDllName)))
                 return true;
 
-            return File.Exists(Path.Combine(gameInstallPath, OptiScalerService.ReShadeCoexistName));
+            return File.Exists(Path.Combine(deployDir, OptiScalerService.ReShadeCoexistName));
         }
 
         /* OptiScaler already claims proxyDllName for itself when present — deploy under the
@@ -85,12 +93,16 @@ namespace HdrUpscaleManager.Services.ReShade
             if (info == null)
                 return Fail("Could not read the game executable's PE header.");
 
+            /* Deploy next to the real exe, not gameInstallPath itself — see
+               PeInspector.ResolveDeployDirectory's own doc comment for why. */
+            var deployDir = Path.GetDirectoryName(exePath) ?? gameInstallPath;
+
             var api = apiOverride ?? info.Api;
             var proxyDllName = ReShadeProxyDll.GetProxyDllName(api);
             if (proxyDllName == null)
                 return Fail($"{api} isn't supported by a drop-in ReShade install.");
 
-            proxyDllName = ResolveTargetDllName(gameInstallPath, proxyDllName);
+            proxyDllName = ResolveTargetDllName(deployDir, proxyDllName);
 
             var versionInfo = await ReShadeVersionChecker.CheckLatestAsync().ConfigureAwait(false);
             if (versionInfo == null)
@@ -119,7 +131,7 @@ namespace HdrUpscaleManager.Services.ReShade
             if (!File.Exists(sourceDll))
                 return Fail($"Extracted {extractedDllName} not found.");
 
-            var targetPath = Path.Combine(gameInstallPath, proxyDllName);
+            var targetPath = Path.Combine(deployDir, proxyDllName);
             BackupIfNeeded(targetPath);
 
             try
@@ -137,6 +149,7 @@ namespace HdrUpscaleManager.Services.ReShade
             {
                 Success = true,
                 InstalledDllPath = targetPath,
+                DeployDirectory = deployDir,
                 Api = api,
                 Version = versionInfo.Version
             };

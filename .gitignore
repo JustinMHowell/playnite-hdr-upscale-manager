@@ -63,6 +63,9 @@ PublishProfiles/*.user
 *.pext
 dist/
 
+# UI test diagnostics (screenshots captured on timeout/failure) — local debugging aid only
+TestScreenshots/
+
 # Local reference clone of upstream RankFTW/RHI (research material only — GPL-3.0 source kept
 # for diffing against UPSTREAM_SYNC.md, never meant to be committed into this repo's tree).
 /reference/

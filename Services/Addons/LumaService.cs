@@ -6,6 +6,7 @@ using System.Linq;
 using System.Net.Http;
 using System.Threading.Tasks;
 using HdrUpscaleManager.Models.Addons;
+using HdrUpscaleManager.Services.ReShade;
 using Newtonsoft.Json.Linq;
 
 namespace HdrUpscaleManager.Services.Addons
@@ -84,10 +85,14 @@ namespace HdrUpscaleManager.Services.Addons
                 return Fail($"Failed to download: {ex.Message}", match.Name);
             }
 
+            /* Deploy next to the real exe, not gameInstallPath itself — see
+               PeInspector.ResolveDeployDirectory's own doc comment for why. */
+            var deployDir = PeInspector.ResolveDeployDirectory(gameInstallPath);
+
             List<string> installedFiles;
             try
             {
-                installedFiles = Deploy(gameInstallPath, match.DownloadUrl, bytes);
+                installedFiles = Deploy(deployDir, match.DownloadUrl, bytes);
             }
             catch (Exception ex)
             {
@@ -95,11 +100,11 @@ namespace HdrUpscaleManager.Services.Addons
                 return Fail($"Failed to install: {ex.Message}", match.Name);
             }
 
-            Log.Info($"Installed Luma mod '{match.Name}' to '{gameInstallPath}' ({installedFiles.Count} file(s)).");
+            Log.Info($"Installed Luma mod '{match.Name}' to '{deployDir}' ({installedFiles.Count} file(s)).");
             return new LumaMatchedInstallResult
             {
                 Success = true,
-                InstalledPath = gameInstallPath,
+                InstalledPath = deployDir,
                 MatchedGameName = match.Name,
                 Notes = match.SpecialNotes,
                 InstalledFiles = installedFiles,

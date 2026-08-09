@@ -3,6 +3,7 @@ using System.IO;
 using System.Net.Http;
 using System.Security.Cryptography;
 using System.Threading.Tasks;
+using HdrUpscaleManager.Services.ReShade;
 
 namespace HdrUpscaleManager.Services.Addons
 {
@@ -51,7 +52,11 @@ namespace HdrUpscaleManager.Services.Addons
                 return Fail($"Failed to download: {ex.Message}");
             }
 
-            var targetPath = Path.Combine(gameInstallPath, addonFileName);
+            /* Deploy next to the real exe (and next to ReShade, which resolves the same way) —
+               not gameInstallPath itself. See PeInspector.ResolveDeployDirectory's own doc
+               comment for why. */
+            var deployDir = PeInspector.ResolveDeployDirectory(gameInstallPath);
+            var targetPath = Path.Combine(deployDir, addonFileName);
             try
             {
                 File.WriteAllBytes(targetPath, bytes);

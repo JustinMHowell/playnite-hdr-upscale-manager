@@ -114,6 +114,21 @@ namespace HdrUpscaleManager.Services.ReShade
             return largest?.FullName;
         }
 
+        /* Every installer (OptiScaler/ReShade/DXVK/RenoDX/Luma) used to deploy straight into
+           installPath itself — wrong whenever the real, loadable exe FindGameExecutable finds
+           sits in a subfolder (e.g. Unreal Engine's Binaries\Win64\), since Windows only checks
+           a DLL's own directory (ahead of System32) for proxy-DLL hijacking, never an unrelated
+           parent folder. Confirmed live 2026-08-09 on Deep Rock Galactic: a proxy dxgi.dll dropped
+           at the install root next to the launcher stub FSD.exe never loaded — the same file
+           dropped next to the real FSD-Win64-Shipping.exe under FSD\Binaries\Win64\ did. Falls
+           back to installPath itself if no exe is found, matching the pre-fix behavior for that
+           case (nothing to resolve against, same as before). */
+        public static string ResolveDeployDirectory(string installPath)
+        {
+            var exePath = FindGameExecutable(installPath);
+            return exePath != null ? Path.GetDirectoryName(exePath) : installPath;
+        }
+
         public static PeInspectionResult Inspect(string exePath)
         {
             try

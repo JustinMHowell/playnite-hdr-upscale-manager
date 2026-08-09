@@ -12,28 +12,29 @@ namespace HdrUpscaleManager.UiTests
     {
         public readonly struct GameConfig
         {
-            public GameConfig(string gameId, string installDirectory, string exeFileName)
+            public GameConfig(string gameId, string installDirectory)
             {
                 GameId = gameId;
                 InstallDirectory = installDirectory;
-                ExeFileName = exeFileName;
             }
 
             public string GameId { get; }
             public string InstallDirectory { get; }
-            public string ExeFileName { get; }
         }
 
         /// <summary>
-        /// Reads HUM_UITEST_{gameKey}_GAME_ID / _INSTALL_DIR / _EXE_NAME. See PLAN.md §9's
-        /// scenario table for the real values to set for each gameKey (e.g. "VAMPIRESURVIVORS").
+        /// Reads HUM_UITEST_{gameKey}_GAME_ID / _INSTALL_DIR. See PLAN.md §9's scenario table
+        /// for the real values to set for each gameKey (e.g. "VAMPIRESURVIVORS"). No exe name is
+        /// needed — GameLaunchAndLogCapture detects whichever process(es) actually run under the
+        /// install directory rather than requiring one guessed in advance (see its own doc
+        /// comment for why: a launcher stub and the real engine process can be two different
+        /// exes, confirmed live on Deep Rock Galactic 2026-08-09).
         /// </summary>
         public static GameConfig Resolve(string gameKey)
         {
             return new GameConfig(
                 Require(gameKey, "GAME_ID"),
-                Require(gameKey, "INSTALL_DIR"),
-                Require(gameKey, "EXE_NAME"));
+                Require(gameKey, "INSTALL_DIR"));
         }
 
         private static string Require(string gameKey, string suffix)
@@ -45,7 +46,7 @@ namespace HdrUpscaleManager.UiTests
                 throw new InvalidOperationException(
                     $"Environment variable '{varName}' isn't set. These are local/library-specific " +
                     "integration tests — see PLAN.md §9's scenario table for this game's real GameId/" +
-                    "install path/exe name, then set the three HUM_UITEST_{gameKey}_* variables " +
+                    $"install path, then set HUM_UITEST_{gameKey}_GAME_ID and HUM_UITEST_{gameKey}_INSTALL_DIR " +
                     "before running.");
             }
 

@@ -26,10 +26,13 @@ namespace HdrUpscaleManager.UiTests
        - The Riftbreaker: ships FSR 1.0 natively, no FSR2/3 patch found — same button, testing the
          FSR1->FSR4 override.
 
-       None of the files OptiScaler deploys (the resolved proxy DLL, OptiScaler.ini, OptiFG's
-       support files) are expected to already exist in a fresh install of any of these three, so
-       this doesn't exercise FileBackup's restore-on-uninstall path — that's DxvkInstallUiTests'
-       job (Mafia). */
+       The resolved proxy DLL/OptiScaler.ini/OptiFG support files are usually brand new on a
+       fresh install, but not always — confirmed live 2026-08-09 that The Riftbreaker's real
+       deploy directory (bin\, next to its actual exe — see PeInspector.ResolveDeployDirectory)
+       already ships its own libxess.dll, the same name OptiScaler's own bundle uses for Intel
+       XeSS support. That exercises FileBackup's restore-on-uninstall path here too, not just in
+       DxvkInstallUiTests (Mafia) — see hadBackup below for how this test tells the two cases
+       apart when asserting the post-uninstall state. */
     [Collection(PlayniteUiCollection.Name)]
     public class OptiScalerInstallUiTests
     {
@@ -71,6 +74,18 @@ namespace HdrUpscaleManager.UiTests
 
                 Assert.False(string.IsNullOrEmpty(record.DllName));
                 Assert.NotEmpty(record.InstalledFiles);
+
+                // A file OptiScaler bundles can collide with one the game already ships under
+                // the same name at its real deploy directory (confirmed live 2026-08-09: The
+                // Riftbreaker's own bin\libxess.dll collides with OptiScaler's bundled Intel XeSS
+                // runtime of the same name) — FileBackup backs the original up as ".original"
+                // and Uninstall restores it, so such a file is expected to still EXIST
+                // afterward, not be gone. Snapshot which entries actually have a backup right
+                // after install, before deciding what "cleaned up" means for each one below.
+                var hadBackup = record.InstalledFiles.ToDictionary(
+                    relative => relative,
+                    relative => File.Exists(Path.Combine(record.InstallPath, relative.TrimEnd(Path.DirectorySeparatorChar)) + ".original"));
+
                 foreach (var relative in record.InstalledFiles)
                 {
                     AssertInstalledEntryExists(record.InstallPath, relative);
@@ -92,7 +107,10 @@ namespace HdrUpscaleManager.UiTests
 
                 foreach (var relative in record.InstalledFiles)
                 {
-                    AssertInstalledEntryGone(record.InstallPath, relative);
+                    if (hadBackup[relative])
+                        AssertBackedUpEntryRestored(record.InstallPath, relative);
+                    else
+                        AssertInstalledEntryGone(record.InstallPath, relative);
                 }
 
                 if (record.OptiPatcherInstalled)
@@ -134,7 +152,7 @@ namespace HdrUpscaleManager.UiTests
             }
         }
 
-        private static void AssertInstalledEntryGone(string installPath, string relative)
+        private void AssertInstalledEntryGone(string installPath, string relative)
         {
             var isDirectory = relative.EndsWith(Path.DirectorySeparatorChar.ToString(), StringComparison.Ordinal);
             var fullPath = Path.Combine(installPath, relative.TrimEnd(Path.DirectorySeparatorChar));
@@ -144,9 +162,31 @@ namespace HdrUpscaleManager.UiTests
                 timeout: TimeSpan.FromSeconds(15),
                 interval: TimeSpan.FromMilliseconds(250)).Result;
 
+            if (!gone)
+                output.WriteLine($"'{fullPath}' still exists after uninstall (see screenshot for context if the manager window was captured elsewhere in this run).");
+
             Assert.True(gone,
                 $"Uninstall removed the tracked record but left '{relative}' behind at '{fullPath}' — " +
                 "this game's install folder is no longer back to its pre-test state.");
+        }
+
+        /* Counterpart to AssertInstalledEntryGone for an entry that collided with a file the
+           game already shipped under the same name at its real deploy directory — Uninstall
+           deletes OptiScaler's own copy and restores the ".original" backup, so the expected
+           end state is "exists again", and the backup itself must be fully consumed. */
+        private static void AssertBackedUpEntryRestored(string installPath, string relative)
+        {
+            var fullPath = Path.Combine(installPath, relative.TrimEnd(Path.DirectorySeparatorChar));
+            var backupPath = fullPath + ".original";
+
+            var restored = Retry.WhileFalse(
+                () => File.Exists(fullPath) && !File.Exists(backupPath),
+                timeout: TimeSpan.FromSeconds(15),
+                interval: TimeSpan.FromMilliseconds(250)).Result;
+
+            Assert.True(restored,
+                $"Uninstall should have restored the pre-existing '{relative}' from its '.original' backup at " +
+                $"'{fullPath}' (exists: {File.Exists(fullPath)}, backup still present: {File.Exists(backupPath)}).");
         }
 
         /* Re-clicks Install every couple seconds until a record appears — the plain WPF
@@ -169,6 +209,7 @@ namespace HdrUpscaleManager.UiTests
 
             if (record == null)
             {
+                WindowScreenshot.CaptureOnTimeout(managerWindow, nameof(ClickInstallUntilRecordAppears), output);
                 output.WriteLine($"No OptiScaler install record for '{gameName}' appeared after {maxAttempts} Install clicks.");
                 output.WriteLine($"Record store checked: {PluginPaths.RecordStorePath(RecordStoreFileName)}");
                 throw new InvalidOperationException(
@@ -196,6 +237,9 @@ namespace HdrUpscaleManager.UiTests
                     timeout: TimeSpan.FromSeconds(3),
                     interval: TimeSpan.FromMilliseconds(250)).Result;
             }
+
+            if (!recordGone)
+                WindowScreenshot.CaptureOnTimeout(managerWindow, nameof(ClickUninstallUntilRecordGone), output);
 
             Assert.True(recordGone,
                 $"OptiScaler install record for '{gameName}' was still present after {maxAttempts} " +

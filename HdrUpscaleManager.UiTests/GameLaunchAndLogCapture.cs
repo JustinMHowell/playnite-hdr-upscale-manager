@@ -15,17 +15,24 @@ namespace HdrUpscaleManager.UiTests
        "Settle" is the detection signal, not a fixed sleep: a log file that exists but is still
        growing means the game/mod is still writing startup output, so this polls file size until
        it's unchanged for a full second before treating it as loaded — letting most runs finish
-       well under the timeout instead of always waiting it out. */
+       well under the timeout instead of always waiting it out.
+
+       Does NOT take a specific exe path to kill — confirmed live 2026-08-09 on Deep Rock
+       Galactic that the top-level exe (what PeInspector.FindGameExecutable would treat as "the"
+       game exe for a game with no obviously-bigger nested binary) can be a small launcher stub
+       that spawns a separate, much larger real engine process (FSD.exe, ~27MB resident, spawning
+       FSD-Win64-Shipping.exe, ~900MB resident) — killing only the guessed exe leaves the real one
+       running. Snapshotting PIDs before launch and killing every NEW process rooted under the
+       install directory afterward catches both, without needing to guess which one is "real". */
     internal static class GameLaunchAndLogCapture
     {
-        private static readonly TimeSpan DefaultTimeout = TimeSpan.FromSeconds(30);
+        private static readonly TimeSpan DefaultTimeout = TimeSpan.FromSeconds(60);
         private static readonly TimeSpan PollInterval = TimeSpan.FromMilliseconds(500);
         private static readonly TimeSpan StableFor = TimeSpan.FromSeconds(1);
 
         public static Dictionary<string, string> LaunchWaitForLogsThenKill(
             string gameId,
             string gameInstallDirectory,
-            string gameExePath,
             IReadOnlyList<string> logFileNames,
             ITestOutputHelper output,
             TimeSpan? timeout = null)
@@ -36,12 +43,14 @@ namespace HdrUpscaleManager.UiTests
                 output.WriteLine($"Watching log file: {path}");
             }
 
+            var pidsBeforeLaunch = new HashSet<int>(Process.GetProcesses().Select(p => p.Id));
+
             output.WriteLine($"Launching game via playnite://playnite/start/{gameId}");
             Process.Start(new ProcessStartInfo($"playnite://playnite/start/{gameId}") { UseShellExecute = true });
 
             WaitForLogsToSettle(logPaths, timeout ?? DefaultTimeout, output);
 
-            KillGameProcess(gameExePath, output);
+            KillNewGameProcesses(gameInstallDirectory, pidsBeforeLaunch, output);
 
             var contents = new Dictionary<string, string>();
             foreach (var path in logPaths)
@@ -111,16 +120,21 @@ namespace HdrUpscaleManager.UiTests
                 "killing the game anyway and reading whatever is on disk now.");
         }
 
-        /* Matches by the exact exe path (from PeInspector.FindGameExecutable) rather than "any
-           process whose working directory is under the install folder" — a launcher/updater
-           process can briefly touch files there too, and an exact executable match is simpler
-           and safer than guessing at that boundary. */
-        private static void KillGameProcess(string gameExePath, ITestOutputHelper output)
+        /* Kills every process that (a) didn't exist before the launch and (b) runs an exe
+           somewhere under gameInstallDirectory — covers a launcher stub and whatever real engine
+           process it spawns without needing to know in advance which one is "real" (see class
+           doc comment). PIDs get reused by the OS over time, so the before/after PID snapshot is
+           inherently a best-effort signal, not a guarantee — acceptable here since this only
+           needs to avoid killing something that was already running, not perfect identity. */
+        private static void KillNewGameProcesses(string gameInstallDirectory, HashSet<int> pidsBeforeLaunch, ITestOutputHelper output)
         {
+            var normalizedDir = Path.GetFullPath(gameInstallDirectory).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
             var killedAny = false;
 
             foreach (var process in Process.GetProcesses())
             {
+                if (pidsBeforeLaunch.Contains(process.Id)) continue;
+
                 string mainModulePath;
                 try
                 {
@@ -132,12 +146,21 @@ namespace HdrUpscaleManager.UiTests
                     continue;
                 }
 
-                if (!string.Equals(mainModulePath, gameExePath, StringComparison.OrdinalIgnoreCase))
+                if (string.IsNullOrEmpty(mainModulePath)) continue;
+
+                string fullModulePath;
+                try
+                {
+                    fullModulePath = Path.GetFullPath(mainModulePath);
+                }
+                catch
                 {
                     continue;
                 }
 
-                output.WriteLine($"Killing game process '{process.ProcessName}' (pid {process.Id}) at '{mainModulePath}'.");
+                if (!fullModulePath.StartsWith(normalizedDir, StringComparison.OrdinalIgnoreCase)) continue;
+
+                output.WriteLine($"Killing new game process '{process.ProcessName}' (pid {process.Id}) at '{mainModulePath}'.");
                 try
                 {
                     process.Kill();
@@ -152,7 +175,7 @@ namespace HdrUpscaleManager.UiTests
 
             if (!killedAny)
             {
-                output.WriteLine($"No running process matched '{gameExePath}' to kill — it may not have launched, " +
+                output.WriteLine($"No new process rooted under '{gameInstallDirectory}' found to kill — it may not have launched, " +
                     "or already exited on its own.");
             }
         }

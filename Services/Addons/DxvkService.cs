@@ -17,6 +17,11 @@ namespace HdrUpscaleManager.Services.Addons
         public List<string> InstalledDlls { get; set; }
         public List<string> BackedUpFiles { get; set; }
         public bool DeployedConf { get; set; }
+        /* The real directory files were deployed to — may differ from the gameInstallPath
+           InstallAsync was called with (see PeInspector.ResolveDeployDirectory). The caller must
+           store THIS as the record's InstallPath, not the original gameInstallPath, so Uninstall
+           later operates on the same directory. */
+        public string DeployDirectory { get; set; }
         public string Version { get; set; }
         /* Always set on success — DXVK is a meaningful compatibility/risk tradeoff, not a
            transparent drop-in, so this is surfaced to the user every time, not just logged. */
@@ -59,6 +64,10 @@ namespace HdrUpscaleManager.Services.Addons
 
             var info = PeInspector.Inspect(exePath);
             if (info == null) return Fail("Could not read the game executable's PE header.");
+
+            /* Deploy next to the real exe, not gameInstallPath itself — see
+               PeInspector.ResolveDeployDirectory's own doc comment for why. */
+            var deployDir = Path.GetDirectoryName(exePath) ?? gameInstallPath;
 
             var api = apiOverride ?? info.Api;
             string[] requiredDlls;
@@ -106,7 +115,7 @@ namespace HdrUpscaleManager.Services.Addons
                 var sourcePath = SevenZipExtractor.FindFile(extractDir, dll, preferredSegment);
                 if (sourcePath == null) return Fail($"Extracted archive is missing {dll}.");
 
-                var targetPath = Path.Combine(gameInstallPath, dll);
+                var targetPath = Path.Combine(deployDir, dll);
                 if (FileBackup.BackupIfNeeded(targetPath)) backedUp.Add(dll);
 
                 try
@@ -125,7 +134,7 @@ namespace HdrUpscaleManager.Services.Addons
             var deployedConf = false;
             try
             {
-                File.WriteAllText(Path.Combine(gameInstallPath, "dxvk.conf"), DefaultDxvkConf);
+                File.WriteAllText(Path.Combine(deployDir, "dxvk.conf"), DefaultDxvkConf);
                 deployedConf = true;
             }
             catch (Exception ex)
@@ -133,13 +142,14 @@ namespace HdrUpscaleManager.Services.Addons
                 Log.Warn(ex, "Failed to write dxvk.conf — DXVK will use its built-in defaults (HDR not force-enabled).");
             }
 
-            Log.Info($"Installed Lilium HDR DXVK {release.Version} ({api}) to '{gameInstallPath}'.");
+            Log.Info($"Installed Lilium HDR DXVK {release.Version} ({api}) to '{deployDir}'.");
             return new DxvkInstallResult
             {
                 Success = true,
                 InstalledDlls = installedDlls,
                 BackedUpFiles = backedUp,
                 DeployedConf = deployedConf,
+                DeployDirectory = deployDir,
                 Version = release.Version,
                 Warning = "DXVK replaces this game's rendering backend with Vulkan — this can trigger anti-cheat bans on " +
                     "protected games, break Steam/Discord/RTSS overlays, and blocks exclusive fullscreen (use borderless " +

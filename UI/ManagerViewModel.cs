@@ -741,7 +741,7 @@ namespace HdrUpscaleManager.UI
                 {
                     GameId = GameId,
                     GameName = GameName,
-                    InstallPath = Game.InstallDirectory,
+                    InstallPath = result.DeployDirectory,
                     InstalledDlls = result.InstalledDlls,
                     BackedUpFiles = result.BackedUpFiles,
                     DeployedConf = result.DeployedConf,
@@ -834,7 +834,7 @@ namespace HdrUpscaleManager.UI
                 {
                     GameId = GameId,
                     GameName = GameName,
-                    InstallPath = Game.InstallDirectory,
+                    InstallPath = result.DeployDirectory,
                     DllName = result.DllName,
                     InstalledFiles = result.InstalledFiles,
                     DlssInputs = dlssInputs,
