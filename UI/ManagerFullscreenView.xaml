@@ -177,6 +177,9 @@
 
                     <TextBlock Text="OptiScaler (AMD)" Style="{StaticResource FsSectionTitle}"/>
                     <TextBlock Text="{Binding OptiScalerStatus}" Style="{StaticResource FsSectionStatus}"/>
+                    <TextBlock Text="{Binding OptiScalerWikiCompatText}" Style="{StaticResource FsSectionStatus}" AutomationProperties.AutomationId="OptiScalerWikiCompatText"/>
+                    <TextBlock Text="Check the game's own graphics settings: if it already offers FSR or XeSS (any version), use 'has FSR/XeSS'. If it only offers DLSS, use 'DLSS-only game'."
+                               Style="{StaticResource FsSectionStatus}"/>
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
                         <Button Content="Install (DLSS-only game)" Style="{StaticResource FsButton}" Command="{Binding OptiScalerInstallDlssCommand}" AutomationProperties.AutomationId="OptiScalerInstallDlss"/>
                         <Button Content="Install (has FSR/XeSS)" Style="{StaticResource FsButton}" Command="{Binding OptiScalerInstallNoDlssCommand}" AutomationProperties.AutomationId="OptiScalerInstallNoDlss"/>

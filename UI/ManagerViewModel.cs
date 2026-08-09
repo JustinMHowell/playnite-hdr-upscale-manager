@@ -47,6 +47,9 @@ namespace HdrUpscaleManager.UI
            listed Direct3D version is 11/12 (just not sure which), as opposed to detectedDxvkApi
            staying Unknown for "can't tell at all". See ShowDxvkSection. */
         private bool wikiConfidentlyAboveDxvkRange;
+        private readonly RemoteManifest cachedManifest;
+        private OptiScalerWikiData optiScalerWikiData;
+        private bool optiScalerWikiLookupInProgress;
 
         public Game Game { get; }
         public string GameName => Game.Name;
@@ -172,7 +175,7 @@ namespace HdrUpscaleManager.UI
             this.userDataPath = userDataPath;
             Game = game;
 
-            var cachedManifest = new ManifestService(userDataPath).TryGetCachedManifest();
+            cachedManifest = new ManifestService(userDataPath).TryGetCachedManifest();
             detectedRenoDxEngine = RenoDxEngineDetector.Detect(
                 Game.InstallDirectory, GameName, cachedManifest?.InstallPathOverrides, cachedManifest?.EngineHintOverrides).Engine;
 
@@ -235,6 +238,60 @@ namespace HdrUpscaleManager.UI
                 pcgwLookupInProgress = true;
                 pcgwLookupTask = RefreshDetectionFromPcGamingWikiAsync();
             }
+
+            optiScalerWikiData = new OptiScalerWikiService(Path.Combine(userDataPath, "OptiScalerWikiCache")).TryGetCachedData();
+            optiScalerWikiLookupInProgress = true;
+            _ = RefreshOptiScalerWikiAsync();
+        }
+
+        /* Fire-and-forget from the constructor, same shape as RefreshDetectionFromPcGamingWikiAsync
+           — the cached answer (if any) already showed instantly via the sync TryGetCachedData
+           call above; this only refreshes it. Purely informational (see OptiScalerWikiCompatText),
+           so nothing else needs to await this the way EnsurePcGamingWikiLookupCompletedAsync's
+           callers do for the PCGamingWiki lookup. */
+        private async Task RefreshOptiScalerWikiAsync()
+        {
+            try
+            {
+                var cacheDir = Path.Combine(userDataPath, "OptiScalerWikiCache");
+                optiScalerWikiData = await new OptiScalerWikiService(cacheDir).FetchAsync().ConfigureAwait(true);
+            }
+            catch (Exception ex)
+            {
+                Log.Warn(ex, $"OptiScaler wiki fetch failed for '{GameName}'.");
+            }
+            finally
+            {
+                optiScalerWikiLookupInProgress = false;
+                OnPropertyChanged(nameof(OptiScalerWikiCompatText));
+            }
+        }
+
+        public string OptiScalerWikiCompatText
+        {
+            get
+            {
+                if (optiScalerWikiData == null)
+                {
+                    return optiScalerWikiLookupInProgress
+                        ? "Checking the OptiScaler compatibility wiki…"
+                        : "Could not check the OptiScaler compatibility wiki (no network and nothing cached yet).";
+                }
+
+                var wikiName = OptiScalerWikiService.ResolveWikiName(GameName, cachedManifest);
+                var entry = FindOptiScalerWikiEntry(wikiName);
+
+                return entry != null && entry.Upscalers.Count > 0
+                    ? $"OptiScaler wiki lists this game's native upscaler(s) as: {string.Join(", ", entry.Upscalers)}."
+                    : "Not listed on the OptiScaler compatibility wiki — check the game's own graphics settings instead.";
+            }
+        }
+
+        private OptiScalerCompatEntry FindOptiScalerWikiEntry(string wikiName)
+        {
+            if (optiScalerWikiData.StandardCompat.TryGetValue(wikiName, out var stdEntry)) return stdEntry;
+            if (optiScalerWikiData.Fsr4Compat.TryGetValue(wikiName, out var fsr4Entry)) return fsr4Entry;
+            return null;
         }
 
         /* Fire-and-forget from the constructor — local detection already ran synchronously above,
