@@ -47,12 +47,26 @@ namespace HdrUpscaleManager.UiTests
             this.output = output;
         }
 
+        // Maps each [InlineData] game name to its HUM_UITEST_{KEY}_GAME_ID/_INSTALL_DIR key —
+        // see PLAN.md §9's scenario table for the real values to set locally.
+        private static string ConfigKeyFor(string gameName) => gameName switch
+        {
+            "Control Ultimate Edition" => "CONTROL",
+            "Deep Rock Galactic" => "DEEPROCKGALACTIC",
+            "The Riftbreaker" => "RIFTBREAKER",
+            _ => throw new ArgumentException($"No LocalTestGameConfig key mapped for '{gameName}' — add one.", nameof(gameName))
+        };
+
         [Theory]
         [InlineData("Control Ultimate Edition", InstallDlssOnlyButton)]
         [InlineData("Deep Rock Galactic", InstallHasFsrButton)]
         [InlineData("The Riftbreaker", InstallHasFsrButton)]
         public void InstallThenUninstallOptiScaler_FromManagerWindow_DeploysFilesAndCleansUpFully(string gameName, string installButton)
         {
+            // Fails fast (Directory.Exists check) if this game isn't actually installed right
+            // now, instead of only surfacing that several UI-driven steps later.
+            LocalTestGameConfig.Resolve(ConfigKeyFor(gameName));
+
             var preExisting = FindRecordByGameName(gameName);
             if (preExisting != null)
             {

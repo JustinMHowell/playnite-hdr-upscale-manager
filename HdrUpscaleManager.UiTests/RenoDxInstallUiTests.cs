@@ -56,6 +56,15 @@ namespace HdrUpscaleManager.UiTests
             this.output = output;
         }
 
+        // Maps each [InlineData] game name to its HUM_UITEST_{KEY}_GAME_ID/_INSTALL_DIR key —
+        // see PLAN.md §9's scenario table for the real values to set locally.
+        private static string ConfigKeyFor(string gameName) => gameName switch
+        {
+            "The Witcher 3: Wild Hunt" => "WITCHER3",
+            "Hollow Knight" => "HOLLOWKNIGHT",
+            _ => throw new ArgumentException($"No LocalTestGameConfig key mapped for '{gameName}' — add one.", nameof(gameName))
+        };
+
         /* Deliberately NOT IClassFixture<PlayniteFixture>: that would share one Playnite
            process across every [InlineData] case, and a leftover open window or stale focus
            from one game's run bled into the next (confirmed live 2026-08-08 — Hollow Knight's
@@ -67,6 +76,10 @@ namespace HdrUpscaleManager.UiTests
         [InlineData("Hollow Knight")]
         public void InstallThenUninstallRenoDx_FromManagerWindow_DownloadsFileAndCleansUpFully(string gameName)
         {
+            // Fails fast (Directory.Exists check) if this game isn't actually installed right
+            // now, instead of only surfacing that several UI-driven steps later.
+            LocalTestGameConfig.Resolve(ConfigKeyFor(gameName));
+
             var preExisting = FindRecordByGameName(gameName);
             if (preExisting != null)
             {
