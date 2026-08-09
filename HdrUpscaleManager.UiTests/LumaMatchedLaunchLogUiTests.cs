@@ -114,8 +114,7 @@ namespace HdrUpscaleManager.UiTests
             }
             finally
             {
-                try { managerWindow?.Close(); } catch (Exception ex) { output.WriteLine($"managerWindow.Close() failed during cleanup: {ex.Message}"); }
-                CleanUp(dir, record, testStartedUtc);
+                CleanUp(fixture, managerWindow, dir, record, testStartedUtc);
             }
         }
 
@@ -130,41 +129,58 @@ namespace HdrUpscaleManager.UiTests
             }
         }
 
-        private void CleanUp(string dir, LumaRecordDto record, DateTime testStartedUtc)
+        private void CleanUp(PlayniteFixture fixture, Window managerWindow, string dir, LumaRecordDto record, DateTime testStartedUtc)
         {
-            if (record == null) return;
-
-            foreach (var relative in record.InstalledFiles)
+            if (record == null)
             {
-                CleanUpFreshlyCreatedFile(Path.Combine(record.InstallPath, relative), testStartedUtc);
+                try { managerWindow?.Close(); } catch (Exception ex) { output.WriteLine($"managerWindow.Close() failed during cleanup: {ex.Message}"); }
+                return;
             }
 
-            // Luma's own runtime log (ReShade.log — see the class doc comment) isn't a deployed
-            // file, so it's not in InstalledFiles above and needs its own cleanup line.
-            CleanUpFreshlyCreatedFile(Path.Combine(record.InstallPath, "ReShade.log"), testStartedUtc);
-
-            // Luma's own record store entry — mirrors what ManagerViewModel's UninstallLumaAsync
-            // does (LumaRecords.Remove), done directly here since there's no need to reopen the
-            // manager window just to click a button for a plain JSON file edit.
             try
             {
-                var path = PluginPaths.RecordStorePath(LumaRecordStoreFileName);
-                if (File.Exists(path))
+                if (managerWindow == null)
                 {
-                    var all = JsonConvert.DeserializeObject<Dictionary<string, LumaRecordDto>>(File.ReadAllText(path)) ?? new Dictionary<string, LumaRecordDto>();
-                    var key = all.FirstOrDefault(kvp => string.Equals(kvp.Value.GameName, GameName, StringComparison.OrdinalIgnoreCase)).Key;
-                    if (key != null)
-                    {
-                        all.Remove(key);
-                        File.WriteAllText(path, JsonConvert.SerializeObject(all));
-                        output.WriteLine($"Removed Luma record for '{GameName}' from '{path}'.");
-                    }
+                    // Reuses the SAME PlayniteFixture the test opened at the top rather than
+                    // constructing a new one — PlayniteFixture's constructor kills and relaunches
+                    // Playnite unconditionally (see its own doc comment), and a second `using`
+                    // scoped to this if-block would dispose that fixture (and shut Playnite down)
+                    // the instant the block ends, right after handing back a managerWindow tied to
+                    // the now-disposed Automation session. Confirmed live 2026-08-09: this produced
+                    // a stale/unsupported automation tree and "Couldn't find the 'Uninstall' button"
+                    // on every run. GameLaunchAndLogCapture only ever touches the GAME process, so
+                    // the outer fixture's Playnite instance is still running here.
+                    managerWindow = ManagerWindowNavigation.Open(fixture, GameName, output);
                 }
+
+                // Uses the real "Uninstall" button (LumaService.Uninstall) rather than hand-
+                // deleting files — that production path already correctly removes now-empty
+                // subfolders (confirmed live 2026-08-08, per its own doc comment), which an
+                // earlier version of this test's cleanup didn't and left an empty Luma\ tree
+                // behind on Vanquish.
+                const int maxAttempts = 5;
+                var recordGone = false;
+                for (var attempt = 1; attempt <= maxAttempts && !recordGone; attempt++)
+                {
+                    ManagerSectionNavigation.ClickSectionButton(managerWindow, "Luma", "Uninstall", output);
+                    recordGone = Retry.WhileFalse(
+                        () => FindLumaRecordByGameName(GameName) == null,
+                        timeout: TimeSpan.FromSeconds(3),
+                        interval: TimeSpan.FromMilliseconds(250)).Result;
+                }
+                if (!recordGone) output.WriteLine($"Luma record for '{GameName}' still present after {maxAttempts} Uninstall clicks.");
+
+                try { managerWindow.Close(); } catch (Exception ex) { output.WriteLine($"managerWindow.Close() failed during cleanup: {ex.Message}"); }
             }
             catch (Exception ex)
             {
-                output.WriteLine($"Failed to remove Luma record for '{GameName}': {ex.Message}");
+                output.WriteLine($"Cleanup failed — '{GameName}' may need manual cleanup: {ex.Message}");
+                throw;
             }
+
+            // Luma's own runtime log (ReShade.log — see the class doc comment) isn't a file
+            // LumaService tracks/removes, so it needs its own cleanup line.
+            CleanUpFreshlyCreatedFile(Path.Combine(record.InstallPath, "ReShade.log"), testStartedUtc);
         }
 
         private static LumaRecordDto FindLumaRecordByGameName(string gameName)

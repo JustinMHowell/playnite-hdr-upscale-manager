@@ -102,7 +102,7 @@ namespace HdrUpscaleManager.UiTests
             }
             finally
             {
-                CleanUp(managerWindow, dir, resolvedDir, addonPath, testStartedUtc);
+                CleanUp(fixture, managerWindow, dir, resolvedDir, addonPath, testStartedUtc);
             }
         }
 
@@ -120,14 +120,14 @@ namespace HdrUpscaleManager.UiTests
             }
         }
 
-        private void CleanUp(Window managerWindow, string dir, string resolvedDir, string addonPath, DateTime testStartedUtc)
+        private void CleanUp(PlayniteFixture fixture, Window managerWindow, string dir, string resolvedDir, string addonPath, DateTime testStartedUtc)
         {
             try
             {
                 if (managerWindow == null)
                 {
-                    using var fixture = new PlayniteFixture();
-                    fixture.GetMainWindow();
+                    // Reuses the outer PlayniteFixture — see LumaMatchedLaunchLogUiTests.CleanUp
+                    // for why constructing a second one here was a real bug, not a flake.
                     managerWindow = ManagerWindowNavigation.Open(fixture, GameName, output);
                     CleanUpViaManagerWindow(managerWindow, dir, resolvedDir, addonPath, testStartedUtc);
                     try { managerWindow.Close(); } catch (Exception ex) { output.WriteLine($"managerWindow.Close() failed during cleanup: {ex.Message}"); }

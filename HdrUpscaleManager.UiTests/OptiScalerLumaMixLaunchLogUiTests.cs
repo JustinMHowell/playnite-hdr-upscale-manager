@@ -118,7 +118,7 @@ namespace HdrUpscaleManager.UiTests
             }
             finally
             {
-                CleanUp(managerWindow, dir, optiScalerRecord, lumaRecord, testStartedUtc);
+                CleanUp(fixture, managerWindow, dir, optiScalerRecord, lumaRecord, testStartedUtc);
             }
         }
 
@@ -136,14 +136,14 @@ namespace HdrUpscaleManager.UiTests
             }
         }
 
-        private void CleanUp(Window managerWindow, string dir, OptiScalerRecordDto optiScalerRecord, LumaRecordDto lumaRecord, DateTime testStartedUtc)
+        private void CleanUp(PlayniteFixture fixture, Window managerWindow, string dir, OptiScalerRecordDto optiScalerRecord, LumaRecordDto lumaRecord, DateTime testStartedUtc)
         {
             try
             {
                 if (managerWindow == null)
                 {
-                    using var fixture = new PlayniteFixture();
-                    fixture.GetMainWindow();
+                    // Reuses the outer PlayniteFixture — see LumaMatchedLaunchLogUiTests.CleanUp
+                    // for why constructing a second one here was a real bug, not a flake.
                     managerWindow = ManagerWindowNavigation.Open(fixture, GameName, output);
                     CleanUpViaManagerWindow(managerWindow, optiScalerRecord, lumaRecord, testStartedUtc);
                     try { managerWindow.Close(); } catch (Exception ex) { output.WriteLine($"managerWindow.Close() failed during cleanup: {ex.Message}"); }
@@ -178,13 +178,25 @@ namespace HdrUpscaleManager.UiTests
                 if (!recordGone) output.WriteLine($"OptiScaler record for '{GameName}' still present after {maxAttempts} Uninstall clicks.");
             }
 
-            if (lumaRecord != null)
+            // Runs after OptiScaler's own uninstall above restores dxgi.dll.original — which, in
+            // this mix, IS Luma's own original file (see the FINDING logged during the test) —
+            // so Luma's real Uninstall button now finds its tracked files back in place. Uses
+            // that button (LumaService.Uninstall) rather than hand-deleting files: that
+            // production path already correctly removes now-empty subfolders (confirmed live
+            // 2026-08-08), which an earlier version of this test's cleanup didn't.
+            if (lumaRecord != null && FindLumaRecordByGameName(GameName) != null)
             {
-                foreach (var relative in lumaRecord.InstalledFiles)
+                const int maxLumaAttempts = 5;
+                var lumaRecordGone = false;
+                for (var attempt = 1; attempt <= maxLumaAttempts && !lumaRecordGone; attempt++)
                 {
-                    CleanUpFreshlyCreatedFile(Path.Combine(lumaRecord.InstallPath, relative), testStartedUtc);
+                    ManagerSectionNavigation.ClickSectionButton(managerWindow, "Luma", "Uninstall", output);
+                    lumaRecordGone = Retry.WhileFalse(
+                        () => FindLumaRecordByGameName(GameName) == null,
+                        timeout: TimeSpan.FromSeconds(3),
+                        interval: TimeSpan.FromMilliseconds(250)).Result;
                 }
-                RemoveLumaRecord();
+                if (!lumaRecordGone) output.WriteLine($"Luma record for '{GameName}' still present after {maxLumaAttempts} Uninstall clicks.");
             }
 
             // Belt-and-suspenders: OptiScaler's own uninstall restores dxgi.dll.original if it
@@ -195,27 +207,6 @@ namespace HdrUpscaleManager.UiTests
                 CleanUpFreshlyCreatedFile(leftoverOriginal, testStartedUtc);
                 CleanUpFreshlyCreatedFile(Path.Combine(optiScalerRecord.InstallPath, "OptiScaler.log"), testStartedUtc);
                 CleanUpFreshlyCreatedFile(Path.Combine(optiScalerRecord.InstallPath, "ReShade.log"), testStartedUtc);
-            }
-        }
-
-        private void RemoveLumaRecord()
-        {
-            try
-            {
-                var path = PluginPaths.RecordStorePath(LumaRecordStoreFileName);
-                if (!File.Exists(path)) return;
-
-                var all = JsonConvert.DeserializeObject<Dictionary<string, LumaRecordDto>>(File.ReadAllText(path)) ?? new Dictionary<string, LumaRecordDto>();
-                var key = all.FirstOrDefault(kvp => string.Equals(kvp.Value.GameName, GameName, StringComparison.OrdinalIgnoreCase)).Key;
-                if (key == null) return;
-
-                all.Remove(key);
-                File.WriteAllText(path, JsonConvert.SerializeObject(all));
-                output.WriteLine($"Removed Luma record for '{GameName}' from '{path}'.");
-            }
-            catch (Exception ex)
-            {
-                output.WriteLine($"Failed to remove Luma record for '{GameName}': {ex.Message}");
             }
         }
 

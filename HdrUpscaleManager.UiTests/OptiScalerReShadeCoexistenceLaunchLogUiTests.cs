@@ -94,7 +94,7 @@ namespace HdrUpscaleManager.UiTests
             }
             finally
             {
-                CleanUpOptiScalerThenReShade(managerWindow, dir, resolvedDir, testStartedUtc);
+                CleanUpOptiScalerThenReShade(fixture, managerWindow, dir, resolvedDir, testStartedUtc);
             }
         }
 
@@ -161,7 +161,7 @@ namespace HdrUpscaleManager.UiTests
             }
             finally
             {
-                CleanUpOptiScalerThenReShade(managerWindow, dir, resolvedDir, testStartedUtc);
+                CleanUpOptiScalerThenReShade(fixture, managerWindow, dir, resolvedDir, testStartedUtc);
             }
         }
 
@@ -206,15 +206,16 @@ namespace HdrUpscaleManager.UiTests
             }
         }
 
-        private void CleanUpOptiScalerThenReShade(Window managerWindow, string dir, string resolvedDir, DateTime testStartedUtc)
+        private void CleanUpOptiScalerThenReShade(PlayniteFixture fixture, Window managerWindow, string dir, string resolvedDir, DateTime testStartedUtc)
         {
             try
             {
                 if (managerWindow == null)
                 {
-                    // The window was closed before launching the game — need it open again to click Uninstall.
-                    using var fixture = new PlayniteFixture();
-                    fixture.GetMainWindow();
+                    // The window was closed before launching the game — need it open again to
+                    // click Uninstall. Reuses the outer PlayniteFixture rather than constructing a
+                    // new one — see LumaMatchedLaunchLogUiTests.CleanUp for why a second one here
+                    // was a real bug, not a flake.
                     managerWindow = ManagerWindowNavigation.Open(fixture, GameName, output);
                     CleanUpViaManagerWindow(managerWindow, dir, resolvedDir, testStartedUtc);
                     try { managerWindow.Close(); } catch (Exception ex) { output.WriteLine($"managerWindow.Close() failed during cleanup: {ex.Message}"); }

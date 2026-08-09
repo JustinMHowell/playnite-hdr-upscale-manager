@@ -93,30 +93,46 @@ namespace HdrUpscaleManager.UiTests
 
             Mouse.Click(moreButton.GetClickablePoint(), MouseButton.Left);
 
-            var submenuHeader = Retry.WhileNull(
-                () => desktop.FindFirstDescendant(cf => cf.ByName("HDR & Upscale Manager")),
-                timeout: TimeSpan.FromSeconds(5)).Result;
-
-            if (submenuHeader == null)
+            // Re-clicks the submenu header (not just re-waits) on each attempt — confirmed live
+            // 2026-08-09 that re-opening this same window right after a real game launch/exit can
+            // have the header's own click register (it's found and clicked without error) without
+            // the "Open in..." flyout actually appearing in time, where the identical sequence
+            // reliably works on the FIRST open of a test run. A single 5s wait wasn't enough to
+            // rule out a dropped click, not just slow rendering.
+            AutomationElement openItem = null;
+            const int maxSubmenuAttempts = 3;
+            for (var attempt = 1; attempt <= maxSubmenuAttempts && openItem == null; attempt++)
             {
-                Dump(output, "desktop (after clicking More)", desktop);
-                throw new InvalidOperationException(
-                    "Couldn't find the 'HDR & Upscale Manager' context-menu submenu after " +
-                    "clicking the sidebar's 'More' button. See the dumped tree above to fix the selector.");
+                var submenuHeader = Retry.WhileNull(
+                    () => desktop.FindFirstDescendant(cf => cf.ByName("HDR & Upscale Manager")),
+                    timeout: TimeSpan.FromSeconds(5)).Result;
+
+                if (submenuHeader == null)
+                {
+                    Dump(output, "desktop (after clicking More)", desktop);
+                    throw new InvalidOperationException(
+                        "Couldn't find the 'HDR & Upscale Manager' context-menu submenu after " +
+                        "clicking the sidebar's 'More' button. See the dumped tree above to fix the selector.");
+                }
+
+                Mouse.Click(submenuHeader.GetClickablePoint(), MouseButton.Left);
+
+                openItem = Retry.WhileNull(
+                    () => desktop.FindFirstDescendant(cf => cf.ByName("Open in HDR & Upscale Manager…")),
+                    timeout: TimeSpan.FromSeconds(5)).Result;
+
+                if (openItem == null)
+                {
+                    output.WriteLine($"'Open in HDR & Upscale Manager…' didn't appear after submenu click attempt {attempt}/{maxSubmenuAttempts} — retrying.");
+                }
             }
-
-            Mouse.Click(submenuHeader.GetClickablePoint(), MouseButton.Left);
-
-            var openItem = Retry.WhileNull(
-                () => desktop.FindFirstDescendant(cf => cf.ByName("Open in HDR & Upscale Manager…")),
-                timeout: TimeSpan.FromSeconds(5)).Result;
 
             if (openItem == null)
             {
                 Dump(output, "desktop (after opening submenu)", desktop);
                 throw new InvalidOperationException(
-                    "Couldn't find the 'Open in HDR & Upscale Manager…' menu item. See the " +
-                    "dumped tree above to fix the selector.");
+                    "Couldn't find the 'Open in HDR & Upscale Manager…' menu item after " +
+                    $"{maxSubmenuAttempts} attempts. See the dumped tree above to fix the selector.");
             }
 
             Mouse.Click(openItem.GetClickablePoint(), MouseButton.Left);
