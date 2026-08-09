@@ -17,16 +17,16 @@ namespace HdrUpscaleManager.UiTests
        follow-up can pick the actual confirmed line(s) to assert on, instead of guessing a
        substring that might not match this ReShade version's real wording.
 
-       Game: Vampire Survivors (GameId da5a9707-232a-4f6a-b151-4473994f1977, confirmed installed
-       2026-08-09 — see PLAN.md §9's scenario table). Picked for this baseline specifically
-       because it's small and quick to launch/kill. NOT Elden Ring — excluded from all testing
-       per GAMES-TO-TEST.md (mid-playthrough). */
+       Game: Vampire Survivors — small and quick to launch/kill, good baseline pick. NOT Elden
+       Ring — excluded from all testing per GAMES-TO-TEST.md (mid-playthrough). Real GameId/
+       install path/exe name are local-library-specific, so they're not hardcoded here — see
+       LocalTestGameConfig and PLAN.md §9's scenario table (set HUM_UITEST_VAMPIRESURVIVORS_*
+       before running this). */
     [Collection(PlayniteUiCollection.Name)]
     public class ReShadeOnlyLaunchLogUiTests
     {
         private const string GameName = "Vampire Survivors";
-        private const string GameId = "da5a9707-232a-4f6a-b151-4473994f1977";
-        private const string GameExeFileName = "VampireSurvivors.exe";
+        private const string GameConfigKey = "VAMPIRESURVIVORS";
 
         // Same candidate list RenoDxInstallUiTests uses — the drop-in proxy names ReShade's own
         // installer picks from depending on the game's detected graphics API.
@@ -42,7 +42,8 @@ namespace HdrUpscaleManager.UiTests
         [Fact]
         public void InstallReShadeThenLaunch_RealGame_ReShadeLogAppearsAndLoads()
         {
-            var gameInstallDirectory = GetKnownInstallDirectory();
+            var game = LocalTestGameConfig.Resolve(GameConfigKey);
+            var gameInstallDirectory = game.InstallDirectory;
 
             var preExistingProxyPath = FindExistingReShadeProxy(gameInstallDirectory);
             if (preExistingProxyPath != null)
@@ -69,9 +70,9 @@ namespace HdrUpscaleManager.UiTests
                 managerWindow.Close();
                 managerWindow = null;
 
-                var gameExePath = Path.Combine(gameInstallDirectory, GameExeFileName);
+                var gameExePath = Path.Combine(gameInstallDirectory, game.ExeFileName);
                 var logContents = GameLaunchAndLogCapture.LaunchWaitForLogsThenKill(
-                    GameId, gameInstallDirectory, gameExePath, new[] { "ReShade.log" }, output);
+                    game.GameId, gameInstallDirectory, gameExePath, new[] { "ReShade.log" }, output);
 
                 var reShadeLogPath = Path.Combine(gameInstallDirectory, "ReShade.log");
                 var content = logContents[reShadeLogPath];
@@ -116,12 +117,6 @@ namespace HdrUpscaleManager.UiTests
             ReShadeProxyDllCandidates
                 .Select(name => Path.Combine(gameInstallDirectory, name))
                 .FirstOrDefault(File.Exists);
-
-        // Hardcoded per PLAN.md §9's scenario table (pulled from the real games.db 2026-08-09) —
-        // same convention RenoDxInstallUiTests uses for its own literal game names/paths rather
-        // than re-deriving them from Playnite at test time.
-        private static string GetKnownInstallDirectory() =>
-            @"c:\program files (x86)\steam\steamapps\common\Vampire Survivors";
 
         private static void CleanUpFreshlyCreatedFile(string path, DateTime testStartedUtc, ITestOutputHelper output)
         {
