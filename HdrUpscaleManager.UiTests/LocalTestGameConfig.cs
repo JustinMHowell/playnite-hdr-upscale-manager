@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 
 namespace HdrUpscaleManager.UiTests
 {
@@ -32,9 +33,21 @@ namespace HdrUpscaleManager.UiTests
         /// </summary>
         public static GameConfig Resolve(string gameKey)
         {
-            return new GameConfig(
-                Require(gameKey, "GAME_ID"),
-                Require(gameKey, "INSTALL_DIR"));
+            var gameId = Require(gameKey, "GAME_ID");
+            var installDirectory = Require(gameKey, "INSTALL_DIR");
+
+            // Fails fast with a specific reason instead of a slow real-launch timeout or a
+            // generic "No executable found" error several layers downstream — e.g. the game got
+            // uninstalled, moved drives, or the env var was set to a typo'd path.
+            if (!Directory.Exists(installDirectory))
+            {
+                throw new InvalidOperationException(
+                    $"HUM_UITEST_{gameKey}_INSTALL_DIR is set to '{installDirectory}', but that folder " +
+                    "doesn't exist. Either the game isn't actually installed on this machine right now, " +
+                    "or the env var is stale/wrong — check it before running this test.");
+            }
+
+            return new GameConfig(gameId, installDirectory);
         }
 
         private static string Require(string gameKey, string suffix)
