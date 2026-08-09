@@ -34,6 +34,7 @@ namespace HdrUpscaleManager.Plugin
             logger.Info($"HDR & Upscale Manager v{PluginVersion} loaded.");
             Log.Info($"HDR & Upscale Manager v{PluginVersion} loaded.");
             settings = new HdrUpscaleManagerSettings();
+            Properties = new GenericPluginProperties { HasSettings = true };
         }
 
         public override ISettings GetSettings(bool firstRunSettings) => settings;

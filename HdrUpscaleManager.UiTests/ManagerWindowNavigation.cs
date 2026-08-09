@@ -150,7 +150,9 @@ namespace HdrUpscaleManager.UiTests
                     $"The manager window ('{titlePrefix}...') never appeared after clicking the menu item.");
             }
 
-            return managerWindowElement.AsWindow();
+            var managerWindow = managerWindowElement.AsWindow();
+            WindowStateHelper.Maximize(managerWindow, output);
+            return managerWindow;
         }
 
         private static void Dump(ITestOutputHelper output, string label, AutomationElement root)

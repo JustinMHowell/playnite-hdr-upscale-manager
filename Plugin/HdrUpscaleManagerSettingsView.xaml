@@ -25,17 +25,12 @@
         <TextBlock Text="{Binding AddonName}" FontSize="20" FontWeight="Bold" Margin="0,0,0,2"/>
         <TextBlock Text="{Binding VersionText}" Foreground="Gray" FontSize="12" Margin="0,0,0,12"/>
 
-        <TextBlock Margin="0,0,0,4">
-            <Run Text="By "/>
-            <Run Text="{Binding AuthorName}" FontWeight="SemiBold"/>
-        </TextBlock>
+        <TextBlock Text="{Binding AuthorLine}" Margin="0,0,0,4"/>
         <Button Content="{Binding RepoUrl}" Style="{StaticResource LinkButton}" Command="{Binding OpenRepoCommand}" Margin="0,0,0,16"/>
 
         <TextBlock Text="Credits" FontWeight="Bold" Margin="0,0,0,4"/>
-        <TextBlock TextWrapping="Wrap" Margin="0,0,0,4">
-            This add-on studies, references, and in places ports design and logic from RankFTW's
-            <Run FontWeight="SemiBold">RHI</Run> — thanks to RankFTW for the original work this project is kept in sync with.
-        </TextBlock>
+        <TextBlock Text="This add-on was inspired by RankFTW's RHI and borrows some ideas from it. Thanks, RankFTW!"
+                   TextWrapping="Wrap" Margin="0,0,0,4"/>
         <Button Content="{Binding RhiRepoUrl}" Style="{StaticResource LinkButton}" Command="{Binding OpenRhiRepoCommand}"/>
     </StackPanel>
 </UserControl>

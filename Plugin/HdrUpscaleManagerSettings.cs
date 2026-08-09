@@ -18,6 +18,7 @@ namespace HdrUpscaleManager.Plugin
         public string AddonName => "HDR & Upscale Manager";
         public string VersionText => $"Version {HdrUpscaleManagerPlugin.PluginVersion}";
         public string AuthorName => "Matheus Faustino";
+        public string AuthorLine => $"By {AuthorName}";
         public string RepoUrl => "https://github.com/matheusfaustino/playnite-hdr-upscale-manager";
         public string RhiRepoUrl => "https://github.com/RankFTW/RHI";
 

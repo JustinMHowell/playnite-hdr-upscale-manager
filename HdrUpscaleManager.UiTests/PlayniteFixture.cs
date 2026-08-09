@@ -102,6 +102,10 @@ namespace HdrUpscaleManager.UiTests
                         // (live-tested 2026-08-08) — the splash/dialog windows never have it.
                         if (window.Name == "Playnite" && window.FindAllChildren().Length > 0)
                         {
+                            // Maximized so every position-based lookup in this suite (see
+                            // WindowStateHelper) always runs against the same full-screen layout,
+                            // regardless of whatever size/position the window last restored to.
+                            WindowStateHelper.Maximize(window);
                             return window;
                         }
                     }
