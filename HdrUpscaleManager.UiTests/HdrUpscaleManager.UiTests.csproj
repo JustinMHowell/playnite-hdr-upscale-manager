@@ -23,6 +23,9 @@
     <!-- Only used to patch config.json's AccessibilityInterface field — see
          PlayniteConfigAccessibility.cs. -->
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+    <!-- Fullscreen-mode tests drive a real virtual Xbox 360 controller via the ViGEmBus driver
+         (https://vigembus.com/) — see GamepadController.cs. Requires the driver installed. -->
+    <PackageReference Include="Nefarius.ViGEm.Client" Version="1.21.256" />
   </ItemGroup>
 
   <!-- stopOnFail: true (see xunit.runner.json) — a failing test aborts the whole run instead of

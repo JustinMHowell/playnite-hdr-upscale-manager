@@ -64,17 +64,18 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- HdrUpscaleManager.Tests, HdrUpscaleManager.UiTests, and reference\RHI (a gitignored
-         local clone of upstream RankFTW/RHI kept for diffing — see .gitignore) all live in
-         subfolders of this project's own directory. Without this, the default item globs
-         below would try to pull their files into this project too — .cs test files (and
-         xunit/FlaUI references), and for reference\RHI specifically, its WinUI 3 .xaml files
-         get auto-included as WPF Page/ApplicationDefinition items and fail to parse (they use
-         WinUI-only markup like XamlControlsResources/RequestedTheme that WPF's XAML compiler
-         doesn't recognize). -->
-    <Compile Remove="HdrUpscaleManager.Tests\**;HdrUpscaleManager.UiTests\**;reference\**" />
-    <EmbeddedResource Remove="HdrUpscaleManager.Tests\**;HdrUpscaleManager.UiTests\**;reference\**" />
-    <None Remove="HdrUpscaleManager.Tests\**;HdrUpscaleManager.UiTests\**;reference\**" />
+    <!-- HdrUpscaleManager.Tests, HdrUpscaleManager.UiTests, GamepadPoc (a local-only, gitignored
+         scratch project — see .git/info/exclude — for probing gamepad/UIA behavior, not part of
+         the shipped addon), and reference\RHI (a gitignored local clone of upstream RankFTW/RHI
+         kept for diffing — see .gitignore) all live in subfolders of this project's own
+         directory. Without this, the default item globs below would try to pull their files into
+         this project too — .cs test files (and xunit/FlaUI/Nefarius references), and for
+         reference\RHI specifically, its WinUI 3 .xaml files get auto-included as WPF
+         Page/ApplicationDefinition items and fail to parse (they use WinUI-only markup like
+         XamlControlsResources/RequestedTheme that WPF's XAML compiler doesn't recognize). -->
+    <Compile Remove="HdrUpscaleManager.Tests\**;HdrUpscaleManager.UiTests\**;GamepadPoc\**;reference\**" />
+    <EmbeddedResource Remove="HdrUpscaleManager.Tests\**;HdrUpscaleManager.UiTests\**;GamepadPoc\**;reference\**" />
+    <None Remove="HdrUpscaleManager.Tests\**;HdrUpscaleManager.UiTests\**;GamepadPoc\**;reference\**" />
     <Page Remove="reference\**" />
     <ApplicationDefinition Remove="reference\**" />
     <Resource Remove="reference\**" />

@@ -50,5 +50,36 @@ namespace HdrUpscaleManager.UI
                 }
             };
         }
+
+        private ManagerViewModel Vm => (ManagerViewModel)DataContext;
+
+        /* Checked/Unchecked fire for every cause that flips IsChecked — a real press (mouse or
+           gamepad A via FocusActivation's IToggleProvider.Toggle(), see UI/FocusActivation.cs)
+           AND the OneWay binding correcting the toggle back if the install/uninstall it just
+           triggered failed. CanExecute-gating (rather than a reentrancy flag) makes both cases
+           safe with the same code: a correction back to "not installed" finds UninstallCommand
+           already un-executable (no record exists) and is a no-op. */
+        private static void ExecuteIfPossible(ICommand command)
+        {
+            if (command.CanExecute(null)) command.Execute(null);
+        }
+
+        private void ReShadeToggle_Checked(object sender, RoutedEventArgs e) => ExecuteIfPossible(Vm.ReShadeInstallCommand);
+        private void ReShadeToggle_Unchecked(object sender, RoutedEventArgs e) => ExecuteIfPossible(Vm.ReShadeUninstallCommand);
+
+        private void LumaToggle_Checked(object sender, RoutedEventArgs e) => ExecuteIfPossible(Vm.LumaInstallCommand);
+        private void LumaToggle_Unchecked(object sender, RoutedEventArgs e) => ExecuteIfPossible(Vm.LumaUninstallCommand);
+
+        private void DxvkToggle_Checked(object sender, RoutedEventArgs e) => ExecuteIfPossible(Vm.DxvkInstallCommand);
+        private void DxvkToggle_Unchecked(object sender, RoutedEventArgs e) => ExecuteIfPossible(Vm.DxvkUninstallCommand);
+
+        private void RenoDxToggle_Checked(object sender, RoutedEventArgs e) => ExecuteIfPossible(Vm.RenoDxInstallCommand);
+        private void RenoDxToggle_Unchecked(object sender, RoutedEventArgs e) => ExecuteIfPossible(Vm.RenoDxUninstallCommand);
+
+        /* OptiScaler has no single "install" command — DLSS-only vs has-FSR/XeSS is a real
+           choice, not a fallback like RenoDX's engine-detect buttons, so this toggle is bound
+           IsEnabled={Binding IsOptiScalerInstalled} in XAML and only ever reachable to turn OFF;
+           installing still goes through the two variant buttons above it. */
+        private void OptiScalerToggle_Unchecked(object sender, RoutedEventArgs e) => ExecuteIfPossible(Vm.OptiScalerUninstallCommand);
     }
 }

@@ -120,10 +120,10 @@
                         <StackPanel Grid.Column="0">
                             <TextBlock Text="ReShade" Style="{StaticResource FsSectionTitle}"/>
                             <TextBlock Text="{Binding ReShadeStatus}" Style="{StaticResource FsSectionStatus}"/>
-                            <StackPanel Orientation="Horizontal">
-                                <Button Content="Install latest" Style="{StaticResource FsButton}" Command="{Binding ReShadeInstallCommand}" AutomationProperties.AutomationId="ReShadeInstall"/>
-                                <Button Content="Uninstall" Style="{StaticResource FsButton}" Command="{Binding ReShadeUninstallCommand}" AutomationProperties.AutomationId="ReShadeUninstall"/>
-                            </StackPanel>
+                            <CheckBox Content="Installed" Style="{StaticResource FsToggle}"
+                                      IsChecked="{Binding IsReShadeInstalled, Mode=OneWay}"
+                                      Checked="ReShadeToggle_Checked" Unchecked="ReShadeToggle_Unchecked"
+                                      AutomationProperties.AutomationId="ReShadeToggle"/>
                         </StackPanel>
 
                         <Border Grid.Column="1" Width="2" Background="#33FFFFFF" Margin="20,0"/>
@@ -139,9 +139,11 @@
                     <TextBlock Text="RenoDX" Style="{StaticResource FsSectionTitle}"/>
                     <TextBlock Text="{Binding RenoDxStatus}" Style="{StaticResource FsSectionStatus}"/>
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
-                        <Button Content="Install" Style="{StaticResource FsButton}" Command="{Binding RenoDxInstallCommand}" AutomationProperties.AutomationId="RenoDxInstall"/>
+                        <CheckBox Content="Installed" Style="{StaticResource FsToggle}" Margin="0,0,20,0"
+                                  IsChecked="{Binding IsRenoDxInstalled, Mode=OneWay}"
+                                  Checked="RenoDxToggle_Checked" Unchecked="RenoDxToggle_Unchecked"
+                                  AutomationProperties.AutomationId="RenoDxToggle"/>
                         <Button Content="Check update" Style="{StaticResource FsButton}" Command="{Binding RenoDxUpdateCommand}" AutomationProperties.AutomationId="RenoDxCheckUpdate"/>
-                        <Button Content="Uninstall" Style="{StaticResource FsButton}" Command="{Binding RenoDxUninstallCommand}" AutomationProperties.AutomationId="RenoDxUninstall"/>
                         <Button Content="Open link" Style="{StaticResource FsButton}" Command="{Binding OpenRenoDxExternalUrlCommand}" AutomationProperties.AutomationId="RenoDxOpenLink"
                                 Visibility="{Binding RenoDxExternalUrl, Converter={StaticResource StringNotEmptyToVis}}"/>
                     </StackPanel>
@@ -158,9 +160,11 @@
                     <TextBlock Text="Luma" Style="{StaticResource FsSectionTitle}"/>
                     <TextBlock Text="{Binding LumaStatus}" Style="{StaticResource FsSectionStatus}"/>
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,20">
-                        <Button Content="Install" Style="{StaticResource FsButton}" Command="{Binding LumaInstallCommand}" AutomationProperties.AutomationId="LumaInstall"/>
+                        <CheckBox Content="Installed" Style="{StaticResource FsToggle}" Margin="0,0,20,0"
+                                  IsChecked="{Binding IsLumaInstalled, Mode=OneWay}"
+                                  Checked="LumaToggle_Checked" Unchecked="LumaToggle_Unchecked"
+                                  AutomationProperties.AutomationId="LumaToggle"/>
                         <Button Content="Check update" Style="{StaticResource FsButton}" Command="{Binding LumaUpdateCommand}" AutomationProperties.AutomationId="LumaCheckUpdate"/>
-                        <Button Content="Uninstall" Style="{StaticResource FsButton}" Command="{Binding LumaUninstallCommand}" AutomationProperties.AutomationId="LumaUninstall"/>
                     </StackPanel>
 
                     <StackPanel Visibility="{Binding ShowDxvkSection, Converter={StaticResource BoolToVis}}">
@@ -168,10 +172,12 @@
                         <TextBlock Text="{Binding DxvkStatus}" Style="{StaticResource FsSectionStatus}"/>
                         <TextBlock Text="{Binding DxvkApiDetectionText}" Style="{StaticResource FsSectionStatus}"/>
                         <StackPanel Orientation="Horizontal" Margin="0,0,0,20">
-                            <Button Content="Install (DX8/DX9/DX10)" Style="{StaticResource FsButton}" Command="{Binding DxvkInstallCommand}" AutomationProperties.AutomationId="DxvkInstall"
-                                    IsEnabled="{Binding CanInstallDxvk}" Visibility="{Binding ShowDxvkInstallButton, Converter={StaticResource BoolToVis}}"/>
+                            <CheckBox Content="Installed" Style="{StaticResource FsToggle}" Margin="0,0,20,0"
+                                      IsChecked="{Binding IsDxvkInstalled, Mode=OneWay}"
+                                      IsEnabled="{Binding CanToggleDxvk}"
+                                      Checked="DxvkToggle_Checked" Unchecked="DxvkToggle_Unchecked"
+                                      AutomationProperties.AutomationId="DxvkToggle"/>
                             <Button Content="Check update" Style="{StaticResource FsButton}" Command="{Binding DxvkUpdateCommand}" AutomationProperties.AutomationId="DxvkCheckUpdate"/>
-                            <Button Content="Uninstall" Style="{StaticResource FsButton}" Command="{Binding DxvkUninstallCommand}" AutomationProperties.AutomationId="DxvkUninstall"/>
                         </StackPanel>
                     </StackPanel>
 
@@ -185,8 +191,14 @@
                         <Button Content="Install (has FSR/XeSS)" Style="{StaticResource FsButton}" Command="{Binding OptiScalerInstallNoDlssCommand}" AutomationProperties.AutomationId="OptiScalerInstallNoDlss"/>
                     </StackPanel>
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,20">
+                        <!-- No Checked handler: disabled while not installed, so the only way in is
+                             the variant buttons above; see OptiScalerToggle_Unchecked in the code-behind. -->
+                        <CheckBox Content="Installed" Style="{StaticResource FsToggle}" Margin="0,0,20,0"
+                                  IsChecked="{Binding IsOptiScalerInstalled, Mode=OneWay}"
+                                  IsEnabled="{Binding IsOptiScalerInstalled}"
+                                  Unchecked="OptiScalerToggle_Unchecked"
+                                  AutomationProperties.AutomationId="OptiScalerToggle"/>
                         <Button Content="Check update" Style="{StaticResource FsButton}" Command="{Binding OptiScalerUpdateCommand}" AutomationProperties.AutomationId="OptiScalerCheckUpdate"/>
-                        <Button Content="Uninstall" Style="{StaticResource FsButton}" Command="{Binding OptiScalerUninstallCommand}" AutomationProperties.AutomationId="OptiScalerUninstall"/>
                     </StackPanel>
                 </StackPanel>
             </ScrollViewer>

@@ -74,6 +74,11 @@ namespace HdrUpscaleManager.UI
            the PCGamingWiki fallback, and hiding the button on every "not detected yet" instant
            would flicker it in and out as detection completes. */
         public bool ShowDxvkInstallButton => detectedDxvkApi == GraphicsApi.Unknown || CanInstallDxvk;
+        /* Fullscreen's single Installed toggle (see ManagerFullscreenView.xaml) has no separate
+           Install/Uninstall targets to gate independently — it must stay interactive to turn
+           OFF an existing install even when ShowDxvkInstallButton would otherwise hide/disable
+           the Desktop view's Install button for an API DXVK doesn't support. */
+        public bool CanToggleDxvk => IsDxvkInstalled || ShowDxvkInstallButton;
         /* Gates the whole DXVK+Lilium HDR section, not just its Install button — true whenever
            we're actually SURE the game's API is above DXVK's D3D8/9/10 range, either because
            local PE inspection found a definite D3D11/12/OpenGL/Vulkan import directly (a known,
@@ -106,15 +111,23 @@ namespace HdrUpscaleManager.UI
            re-detects the deployed DLL live, same as ReShadeInstallService.IsInstalled itself. */
         public string ReShadeStatus =>
             ReShadeInstallService.IsInstalled(Game.InstallDirectory, KnownGraphicsApiOrNull) ? "Installed." : "Not installed.";
+        public bool IsReShadeInstalled =>
+            ReShadeInstallService.IsInstalled(Game.InstallDirectory, KnownGraphicsApiOrNull);
 
         private string renoDxStatus;
         public string RenoDxStatus { get => renoDxStatus; private set => SetProperty(ref renoDxStatus, value); }
+
+        private bool isRenoDxInstalled;
+        public bool IsRenoDxInstalled { get => isRenoDxInstalled; private set => SetProperty(ref isRenoDxInstalled, value); }
 
         private string renoDxExternalUrl;
         public string RenoDxExternalUrl { get => renoDxExternalUrl; private set => SetProperty(ref renoDxExternalUrl, value); }
 
         private string lumaStatus;
         public string LumaStatus { get => lumaStatus; private set => SetProperty(ref lumaStatus, value); }
+
+        private bool isLumaInstalled;
+        public bool IsLumaInstalled { get => isLumaInstalled; private set => SetProperty(ref isLumaInstalled, value); }
 
         /* dgVoodoo2 has no manual install/uninstall surface of its own — it's purely an
            automatic prerequisite step InstallLumaAsync runs first for whichever games the Luma
@@ -127,8 +140,14 @@ namespace HdrUpscaleManager.UI
         private string dxvkStatus;
         public string DxvkStatus { get => dxvkStatus; private set => SetProperty(ref dxvkStatus, value); }
 
+        private bool isDxvkInstalled;
+        public bool IsDxvkInstalled { get => isDxvkInstalled; private set => SetProperty(ref isDxvkInstalled, value); }
+
         private string optiScalerStatus;
         public string OptiScalerStatus { get => optiScalerStatus; private set => SetProperty(ref optiScalerStatus, value); }
+
+        private bool isOptiScalerInstalled;
+        public bool IsOptiScalerInstalled { get => isOptiScalerInstalled; private set => SetProperty(ref isOptiScalerInstalled, value); }
 
         private bool hdrToggleEnabled;
         public bool HdrToggleEnabled
@@ -337,6 +356,7 @@ namespace HdrUpscaleManager.UI
             {
                 pcgwLookupInProgress = false;
                 OnPropertyChanged(nameof(ReShadeStatus));
+                OnPropertyChanged(nameof(IsReShadeInstalled));
                 OnPropertyChanged(nameof(RenoDxEngineDetectionText));
                 OnPropertyChanged(nameof(CanInstallUnrealRenoDx));
                 OnPropertyChanged(nameof(CanInstallUnityRenoDx));
@@ -344,6 +364,7 @@ namespace HdrUpscaleManager.UI
                 OnPropertyChanged(nameof(CanInstallDxvk));
                 OnPropertyChanged(nameof(ShowDxvkInstallButton));
                 OnPropertyChanged(nameof(ShowDxvkSection));
+                OnPropertyChanged(nameof(CanToggleDxvk));
                 CommandManager.InvalidateRequerySuggested();
             }
         }
@@ -359,23 +380,29 @@ namespace HdrUpscaleManager.UI
         private void RefreshStatuses()
         {
             OnPropertyChanged(nameof(ReShadeStatus));
+            OnPropertyChanged(nameof(IsReShadeInstalled));
 
             var renoDx = RenoDxRecords.Get(GameId);
             RenoDxStatus = renoDx != null ? $"Installed ({renoDx.MatchedWikiName ?? renoDx.AddonFileName})" : "Not installed.";
+            IsRenoDxInstalled = renoDx != null;
 
             var luma = LumaRecords.Get(GameId);
             var dgvoodoo2 = Dgvoodoo2Records.Get(GameId);
             LumaStatus = luma != null
                 ? $"Installed (build {luma.InstalledBuildNumber})" + (dgvoodoo2 != null ? $" + dgVoodoo2 {dgvoodoo2.Version}" : "")
                 : "Not installed.";
+            IsLumaInstalled = luma != null;
 
             var dxvk = DxvkRecords.Get(GameId);
             DxvkStatus = dxvk != null ? $"Installed ({dxvk.Version}, {string.Join("+", dxvk.InstalledDlls)})" : "Not installed.";
+            IsDxvkInstalled = dxvk != null;
+            OnPropertyChanged(nameof(CanToggleDxvk));
 
             var optiScaler = OptiScalerRecords.Get(GameId);
             OptiScalerStatus = optiScaler != null
                 ? $"Installed ({optiScaler.Version}, {(optiScaler.DlssInputs ? "DLSS-only mode" : "native upscaler mode")})"
                 : "Not installed.";
+            IsOptiScalerInstalled = optiScaler != null;
 
             hdrToggleEnabled = new JsonRecordStore<bool>(userDataPath, "hdr_toggle_opt_in.json").Get(GameId);
             OnPropertyChanged(nameof(HdrToggleEnabled));
