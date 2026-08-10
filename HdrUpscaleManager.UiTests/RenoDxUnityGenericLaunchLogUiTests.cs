@@ -12,7 +12,8 @@ namespace HdrUpscaleManager.UiTests
        RenoDxInstallUiTests (which only exercises the plain wiki-matched "Install" button — see
        that class's own doc comment / GAMES-TO-TEST.md's "Not yet covered" section). Same
        calibration-first principle as RenoDxMatchedLaunchLogUiTests: confirms ReShade actually
-       loads and registers the generic RenoDX build at runtime, not just file presence.
+       loads and registers the generic RenoDX build at runtime, not just file presence. Asserts on
+       `Registered add-on "RenoDX"` — confirmed live 2026-08-10 against a real ReShade.log.
 
        Deliberately does NOT poll renodx_installs.json — confirmed live 2026-08-09 that
        InstallRenoDxEngineAsync's own doc comment is explicit: "No RenoDxRecords entry is written
@@ -88,13 +89,13 @@ namespace HdrUpscaleManager.UiTests
                 var reShadeLogPath = Path.Combine(resolvedDir, "ReShade.log");
                 var content = logContents[reShadeLogPath];
 
-                Assert.False(string.IsNullOrWhiteSpace(content), "ReShade.log is missing or empty — ReShade may not have loaded, so RenoDX couldn't either.");
-
                 output.WriteLine("--- ReShade.log content (first 4000 chars) ---");
                 output.WriteLine(content.Length > 4000 ? content.Substring(0, 4000) : content);
                 output.WriteLine("--- end ReShade.log content ---");
 
-                Assert.Contains("Searching for add-ons", content);
+                // Same confirmed line as RenoDxMatchedLaunchLogUiTests — proves the generic addon
+                // build was actually recognized and loaded, not just that ReShade scanned for one.
+                Assert.Contains("Registered add-on \"RenoDX\"", content);
             }
             finally
             {

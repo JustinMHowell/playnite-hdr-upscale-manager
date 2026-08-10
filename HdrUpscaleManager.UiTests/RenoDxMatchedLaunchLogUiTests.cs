@@ -16,10 +16,10 @@ namespace HdrUpscaleManager.UiTests
        scanned for addons — not just that files landed on disk, which RenoDxInstallUiTests already
        covers.
 
-       Deliberately NOT asserting a specific "RenoDX addon recognized" log line yet — same
-       calibration-first principle as scenario 1 (ReShadeOnlyLaunchLogUiTests): this run's job is
-       to capture what ReShade's log looks like with a real RenoDX addon present, so a follow-up
-       can pick the actual confirmed line to assert on.
+       Asserts on `Registered add-on "RenoDX"` — ReShade's own add-on-registration line, confirmed
+       live 2026-08-10 against a real ReShade.log — rather than just "Searching for add-ons",
+       which only proves ReShade scanned for addons, not that RenoDX's specifically was found and
+       loaded.
 
        Game: Hollow Knight — GAMES-TO-TEST.md's own "safest bet" RenoDX-matched pick, and its real
        exe (hollow_knight.exe) sits at the install root, so no nested-exe complexity here (unlike
@@ -92,13 +92,11 @@ namespace HdrUpscaleManager.UiTests
                 var reShadeLogPath = Path.Combine(resolvedDir, "ReShade.log");
                 var content = logContents[reShadeLogPath];
 
-                Assert.False(string.IsNullOrWhiteSpace(content), "ReShade.log is missing or empty — ReShade may not have loaded, so RenoDX couldn't either.");
-
                 output.WriteLine("--- ReShade.log content (first 4000 chars) ---");
                 output.WriteLine(content.Length > 4000 ? content.Substring(0, 4000) : content);
                 output.WriteLine("--- end ReShade.log content ---");
 
-                Assert.Contains("Searching for add-ons", content);
+                Assert.Contains("Registered add-on \"RenoDX\"", content);
             }
             finally
             {

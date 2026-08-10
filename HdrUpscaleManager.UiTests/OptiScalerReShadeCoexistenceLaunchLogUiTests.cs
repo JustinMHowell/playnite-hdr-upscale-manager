@@ -185,8 +185,10 @@ namespace HdrUpscaleManager.UiTests
             var optiScalerLog = logContents[Path.Combine(resolvedDir, "OptiScaler.log")];
             var reShadeLog = logContents[Path.Combine(resolvedDir, "ReShade.log")];
 
-            Assert.False(string.IsNullOrWhiteSpace(optiScalerLog), "OptiScaler.log is missing or empty — OptiScaler may not have loaded.");
-            Assert.False(string.IsNullOrWhiteSpace(reShadeLog), "ReShade.log is missing or empty — ReShade may not have chain-loaded via OptiScaler's LoadReshade setting.");
+            // Same confirmed substrings as OptiScalerOnlyLaunchLogUiTests/ReShadeOnlyLaunchLogUiTests —
+            // both components genuinely loaded, not just wrote a non-empty file.
+            Assert.Contains("OptiScaler working as dxgi.dll", optiScalerLog);
+            Assert.Contains("crosire's ReShade", reShadeLog);
         }
 
         private void GuardNoPreExistingInstall(string dir)

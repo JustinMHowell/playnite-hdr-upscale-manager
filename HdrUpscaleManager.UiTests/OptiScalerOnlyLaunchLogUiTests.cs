@@ -18,9 +18,9 @@ namespace HdrUpscaleManager.UiTests
        only proves the files/ini land on disk, not that OptiScaler's own DLL initializes and
        writes anything once the game is actually running.
 
-       Deliberately NOT asserting a specific log line yet — same "detection-without-guessing"
-       principle as ReShadeOnlyLaunchLogUiTests: capture the real content first, pick a confirmed
-       substring (e.g. a resolved upscaler backend line) in a follow-up once it's been seen.
+       Asserts on "OptiScaler working as dxgi.dll" — confirmed live 2026-08-10 against a real
+       OptiScaler.log (v0.9.4-final) — rather than the version banner line, since that changes
+       with every OptiScaler release while this "it's actually acting as the proxy" line doesn't.
 
        Game: Deep Rock Galactic — ships DLSS + FSR2 natively (never patched to FSR3/4), so
        "Install (has FSR/XeSS)" exercises the FSR2->FSR4 override path; already the proven pick
@@ -88,7 +88,7 @@ namespace HdrUpscaleManager.UiTests
                 var content = logContents[optiScalerLogPath];
 
                 Assert.True(File.Exists(optiScalerLogPath), $"Expected 'OptiScaler.log' to exist at '{optiScalerLogPath}' after launching the game.");
-                Assert.False(string.IsNullOrWhiteSpace(content), "OptiScaler.log exists but is empty — OptiScaler may not have actually loaded.");
+                Assert.Contains("OptiScaler working as dxgi.dll", content);
 
                 output.WriteLine("--- OptiScaler.log content (first 4000 chars) ---");
                 output.WriteLine(content.Length > 4000 ? content.Substring(0, 4000) : content);

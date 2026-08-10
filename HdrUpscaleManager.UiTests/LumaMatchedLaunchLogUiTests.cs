@@ -10,17 +10,18 @@ using Xunit.Abstractions;
 
 namespace HdrUpscaleManager.UiTests
 {
-    /* Scenario 4 of PLAN.md §9 — real-launch log verification for Luma. Also the run meant to
-       settle PLAN.md §9's own open question: "does Luma log anything, and where" — every Luma
-       mod inspected so far ships its own self-hosted dxgi.dll/.addon rather than depending on a
-       separately-installed ReShade (see the Hard Dependencies table in PLAN.md §6.5), but nobody
-       had confirmed whether that self-hosted proxy produces a log file at all until this test
-       actually launches a game with it installed.
+    /* Scenario 4 of PLAN.md §9 — real-launch log verification for Luma. Also the run that settled
+       PLAN.md §9's own open question: "does Luma log anything, and where" — every Luma mod
+       inspected so far ships its own self-hosted dxgi.dll/.addon rather than depending on a
+       separately-installed ReShade (see the Hard Dependencies table in PLAN.md §6.5). Confirmed
+       live 2026-08-10: yes, a real ReShade.log (v6.7.3.2, 32-bit — Luma's own bundled fork), with
+       `Registered add-on "Luma"` as the confirmed line proving it actually loaded, not just that
+       files landed on disk.
 
-       Deliberately doesn't assert a specific log line/filename yet, matching the calibration-
-       first principle of every other scenario test in this pass — this run's job is to capture
-       whatever the real directory listing/log content looks like after a real launch, and print
-       it, so a follow-up can pick real confirmed assertions instead of guessing.
+       Vanquish itself exits ~1.3s after the swap chain is created regardless of Luma — an
+       already-documented, unrelated finding (PLAN.md's dgVoodoo2/Vanquish entry: likely a Steam
+       DRM/ownership check failing because Playnite launches the exe directly). That happens well
+       after Luma's own registration line, so it doesn't affect this assertion.
 
        Game: Vanquish — GAMES-TO-TEST.md's own Luma-matched pick, confirmed installed. Real exe
        (Vanquish.exe) sits at the install root. */
@@ -39,7 +40,7 @@ namespace HdrUpscaleManager.UiTests
         }
 
         [Fact]
-        public void InstallLumaMatchedThenLaunch_RealGame_CapturesWhateverItLogs()
+        public void InstallLumaMatchedThenLaunch_RealGame_ReShadeLogShowsLumaRegistered()
         {
             var game = LocalTestGameConfig.Resolve(GameConfigKey);
             var dir = game.InstallDirectory;
@@ -66,7 +67,7 @@ namespace HdrUpscaleManager.UiTests
 
                 if (!appeared)
                 {
-                    WindowScreenshot.CaptureOnTimeout(managerWindow, nameof(InstallLumaMatchedThenLaunch_RealGame_CapturesWhateverItLogs), output);
+                    WindowScreenshot.CaptureOnTimeout(managerWindow, nameof(InstallLumaMatchedThenLaunch_RealGame_ReShadeLogShowsLumaRegistered), output);
                     output.WriteLine(AutomationTreeDumper.Dump(managerWindow));
                 }
                 Assert.True(appeared, $"Luma install didn't complete for '{GameName}' within the retry window.");
@@ -94,10 +95,13 @@ namespace HdrUpscaleManager.UiTests
                 output.WriteLine($"ReShade.log exists: {content != null}");
                 if (content != null)
                 {
-                    output.WriteLine("--- ReShade.log content (first 4000 chars) ---");
-                    output.WriteLine(content.Length > 4000 ? content.Substring(0, 4000) : content);
+                    output.WriteLine("--- ReShade.log content (first 6000 chars) ---");
+                    output.WriteLine(content.Length > 6000 ? content.Substring(0, 6000) : content);
                     output.WriteLine("--- end ReShade.log content ---");
                 }
+
+                Assert.False(string.IsNullOrWhiteSpace(content), "ReShade.log is missing or empty — Luma's self-hosted proxy may not have loaded.");
+                Assert.Contains("Registered add-on \"Luma\"", content);
 
                 // Whatever new files showed up after launch, regardless of name — the actual
                 // discovery step PLAN.md §9 asked for.

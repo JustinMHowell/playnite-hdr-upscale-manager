@@ -54,7 +54,7 @@ else {
     $project = "$root\HdrUpscaleManager.Tests"
 }
 
-$testArgs = @("test", $project, "-c", "Debug")
+$testArgs = @("test", $project, "-c", "Debug", "--logger", "console;verbosity=detailed")
 if ($Filter) { $testArgs += @("--filter", $Filter) }
 
 dotnet @testArgs

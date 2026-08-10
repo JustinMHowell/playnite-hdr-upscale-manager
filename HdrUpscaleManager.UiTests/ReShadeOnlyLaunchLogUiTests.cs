@@ -13,10 +13,9 @@ namespace HdrUpscaleManager.UiTests
        Playnite, and captures ReShade.log to confirm it actually loaded at runtime rather than
        just checking file presence like OptiScalerInstallUiTests/RenoDxInstallUiTests do.
 
-       Deliberately NOT asserting a specific log line yet — PLAN.md §9's own "detection-without-
-       guessing" principle: this run's job is to capture what a real ReShade.log looks like so a
-       follow-up can pick the actual confirmed line(s) to assert on, instead of guessing a
-       substring that might not match this ReShade version's real wording.
+       Asserts on "crosire's ReShade" (the initializing-version banner line) rather than the
+       full version string — confirmed live 2026-08-10 against a real ReShade.log (v6.8.0.2155),
+       and the version number will drift with future ReShade releases while the author name won't.
 
        Game: Vampire Survivors — small and quick to launch/kill, good baseline pick. NOT Elden
        Ring — excluded from all testing per GAMES-TO-TEST.md (mid-playthrough). Real GameId/
@@ -78,7 +77,7 @@ namespace HdrUpscaleManager.UiTests
                 var content = logContents[reShadeLogPath];
 
                 Assert.True(File.Exists(reShadeLogPath), $"Expected 'ReShade.log' to exist at '{reShadeLogPath}' after launching the game.");
-                Assert.False(string.IsNullOrWhiteSpace(content), "ReShade.log exists but is empty — ReShade may not have actually loaded.");
+                Assert.Contains("crosire's ReShade", content);
 
                 output.WriteLine("--- ReShade.log content (first 4000 chars) ---");
                 output.WriteLine(content.Length > 4000 ? content.Substring(0, 4000) : content);
