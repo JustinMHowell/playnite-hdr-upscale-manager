@@ -33,11 +33,11 @@ param(
 $ErrorActionPreference = 'Stop'
 $root = $PSScriptRoot
 
-# steam://rungameid URL behind the "Playnite" shortcut on this machine's Desktop
-# (C:\Users\Matheus\Desktop\Playnite.url) — relaunching through Steam instead of the
-# bare exe so it comes up the same way it normally does (overlay, input, etc). Playnite
-# itself is a non-Steam-game shortcut here (D:\Playnite\Playnite\), not under
-# %LOCALAPPDATA%\Playnite or on PATH, which is why a plain exe lookup doesn't find it.
+# steam://rungameid URL behind the "Playnite" shortcut on this machine's Desktop —
+# relaunching through Steam instead of the bare exe so it comes up the same way it
+# normally does (overlay, input, etc). Playnite itself is a non-Steam-game shortcut
+# here, not under %LOCALAPPDATA%\Playnite or on PATH, which is why a plain exe
+# lookup doesn't find it.
 $playniteSteamUrl = 'steam://rungameid/15319020825756041216'
 
 # --- Close Playnite (its extension DLLs are locked while running) ---------
