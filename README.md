@@ -16,11 +16,6 @@ Or run [`build-and-run.ps1`](build-and-run.ps1) to do steps 2–5 (plus restarti
 
 Prebuilt `.pext` / `.zip` files are also published on the [Releases page](../../releases) once a version is tagged — see [RELEASING.md](RELEASING.md).
 
-## Where to find it
-
-- **Main menu** → **HDR & Upscale Manager** → **Say hello** (the starter entry point — replace with whatever this add-on actually does: a sidebar item, a game menu item, a library/metadata provider, etc.)
-- **Add-ons → Extensions settings** for the configurable greeting.
-
 ## License
 
 GPL-3.0
