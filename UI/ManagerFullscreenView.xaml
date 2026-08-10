@@ -78,6 +78,41 @@
             </Setter>
         </Style>
 
+        <Style x:Key="FsToggleButton" TargetType="ToggleButton">
+            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontSize" Value="19"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="HorizontalAlignment" Value="Left"/>
+            <Setter Property="Content" Value="Disabled"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ToggleButton">
+                        <Border x:Name="Bg" Background="#FF23262C" BorderBrush="Transparent" BorderThickness="3" CornerRadius="10" Padding="16,10">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Bg" Property="Background" Value="#FF2A3F2E"/>
+                                <Setter TargetName="Bg" Property="BorderBrush" Value="#FF6FCF7A"/>
+                            </Trigger>
+                            <Trigger Property="IsFocused" Value="True">
+                                <Setter TargetName="Bg" Property="BorderBrush" Value="#FFE0BE79"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsChecked" Value="True">
+                    <Setter Property="Content" Value="Enabled"/>
+                </Trigger>
+                <Trigger Property="IsChecked" Value="False">
+                    <Setter Property="Content" Value="Disabled"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
         <Style x:Key="FsSectionTitle" TargetType="TextBlock">
             <Setter Property="FontSize" Value="24"/>
             <Setter Property="FontWeight" Value="Bold"/>
@@ -156,40 +191,54 @@
                             <TextBlock Text="OS HDR toggle on launch/exit" Style="{StaticResource FsSectionTitle}"/>
                             <TextBlock Text="Unverified — validate on your own display before relying on it."
                                        Style="{StaticResource FsSectionStatus}"/>
-                            <CheckBox Content="Enable for this game" Style="{StaticResource FsToggle}" IsChecked="{Binding HdrToggleEnabled}" AutomationProperties.AutomationId="HdrToggleEnabled"/>
+                            <ToggleButton Style="{StaticResource FsToggleButton}" IsChecked="{Binding HdrToggleEnabled}" AutomationProperties.AutomationId="HdrToggleEnabled"/>
                         </StackPanel>
                     </Grid>
 
-                    <TextBlock Text="RenoDX" Style="{StaticResource FsSectionTitle}"/>
-                    <TextBlock Text="{Binding RenoDxStatus}" Style="{StaticResource FsSectionStatus}"/>
-                    <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
-                        <CheckBox Content="Installed" Style="{StaticResource FsToggle}" Margin="0,0,20,0"
-                                  IsChecked="{Binding IsRenoDxInstalled, Mode=OneWay}"
-                                  Checked="RenoDxToggle_Checked" Unchecked="RenoDxToggle_Unchecked"
-                                  AutomationProperties.AutomationId="RenoDxToggle"/>
-                        <Button Content="Check update" Style="{StaticResource FsButton}" Command="{Binding RenoDxUpdateCommand}" AutomationProperties.AutomationId="RenoDxCheckUpdate"/>
-                        <Button Content="Open link" Style="{StaticResource FsButton}" Command="{Binding OpenRenoDxExternalUrlCommand}" AutomationProperties.AutomationId="RenoDxOpenLink"
-                                Visibility="{Binding RenoDxExternalUrl, Converter={StaticResource StringNotEmptyToVis}}"/>
-                    </StackPanel>
-                    <TextBlock Text="{Binding RenoDxEngineDetectionText}" Style="{StaticResource FsSectionStatus}" Margin="0,0,0,4"/>
-                    <StackPanel Orientation="Horizontal" Margin="0,0,0,20">
-                        <Button Content="Unreal Engine, generic" Style="{StaticResource FsButton}" Command="{Binding RenoDxInstallUnrealGenericCommand}" AutomationProperties.AutomationId="RenoDxInstallUnrealGeneric"
-                                IsEnabled="{Binding CanInstallUnrealRenoDx}" Visibility="{Binding CanInstallUnrealRenoDx, Converter={StaticResource BoolToVis}}"/>
-                        <Button Content="Unreal Engine, UE-Extended" Style="{StaticResource FsButton}" Command="{Binding RenoDxInstallUnrealUeExtendedCommand}" AutomationProperties.AutomationId="RenoDxInstallUnrealUeExtended"
-                                IsEnabled="{Binding CanInstallUnrealRenoDx}" Visibility="{Binding CanInstallUnrealRenoDx, Converter={StaticResource BoolToVis}}"/>
-                        <Button Content="Unity, generic" Style="{StaticResource FsButton}" Command="{Binding RenoDxInstallUnityCommand}" AutomationProperties.AutomationId="RenoDxInstallUnity"
-                                IsEnabled="{Binding CanInstallUnityRenoDx}" Visibility="{Binding CanInstallUnityRenoDx, Converter={StaticResource BoolToVis}}"/>
-                    </StackPanel>
+                    <Grid Margin="0,0,0,20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
 
-                    <TextBlock Text="Luma" Style="{StaticResource FsSectionTitle}"/>
-                    <TextBlock Text="{Binding LumaStatus}" Style="{StaticResource FsSectionStatus}"/>
-                    <StackPanel Orientation="Horizontal" Margin="0,0,0,20">
-                        <CheckBox Content="Installed" Style="{StaticResource FsToggle}" Margin="0,0,20,0"
-                                  IsChecked="{Binding IsLumaInstalled, Mode=OneWay}"
-                                  Checked="LumaToggle_Checked" Unchecked="LumaToggle_Unchecked"
-                                  AutomationProperties.AutomationId="LumaToggle"/>
-                        <Button Content="Check update" Style="{StaticResource FsButton}" Command="{Binding LumaUpdateCommand}" AutomationProperties.AutomationId="LumaCheckUpdate"/>
-                    </StackPanel>
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="RenoDX" Style="{StaticResource FsSectionTitle}"/>
+                            <TextBlock Text="{Binding RenoDxStatus}" Style="{StaticResource FsSectionStatus}"/>
+                            <WrapPanel Margin="0,0,0,8">
+                                <CheckBox Content="Installed" Style="{StaticResource FsToggle}" Margin="0,0,20,10"
+                                          IsChecked="{Binding IsRenoDxInstalled, Mode=OneWay}"
+                                          Checked="RenoDxToggle_Checked" Unchecked="RenoDxToggle_Unchecked"
+                                          AutomationProperties.AutomationId="RenoDxToggle"/>
+                                <Button Content="Check update" Style="{StaticResource FsButton}" Command="{Binding RenoDxUpdateCommand}" AutomationProperties.AutomationId="RenoDxCheckUpdate" Margin="0,0,10,10"/>
+                                <Button Content="Open link" Style="{StaticResource FsButton}" Command="{Binding OpenRenoDxExternalUrlCommand}" AutomationProperties.AutomationId="RenoDxOpenLink" Margin="0,0,10,10"
+                                        Visibility="{Binding RenoDxExternalUrl, Converter={StaticResource StringNotEmptyToVis}}"/>
+                            </WrapPanel>
+                            <TextBlock Text="{Binding RenoDxEngineDetectionText}" Style="{StaticResource FsSectionStatus}" Margin="0,0,0,4"/>
+                            <WrapPanel>
+                                <Button Content="Unreal Engine, generic" Style="{StaticResource FsButton}" Command="{Binding RenoDxInstallUnrealGenericCommand}" AutomationProperties.AutomationId="RenoDxInstallUnrealGeneric" Margin="0,0,10,10"
+                                        IsEnabled="{Binding CanInstallUnrealRenoDx}" Visibility="{Binding CanInstallUnrealRenoDx, Converter={StaticResource BoolToVis}}"/>
+                                <Button Content="Unreal Engine, UE-Extended" Style="{StaticResource FsButton}" Command="{Binding RenoDxInstallUnrealUeExtendedCommand}" AutomationProperties.AutomationId="RenoDxInstallUnrealUeExtended" Margin="0,0,10,10"
+                                        IsEnabled="{Binding CanInstallUnrealRenoDx}" Visibility="{Binding CanInstallUnrealRenoDx, Converter={StaticResource BoolToVis}}"/>
+                                <Button Content="Unity, generic" Style="{StaticResource FsButton}" Command="{Binding RenoDxInstallUnityCommand}" AutomationProperties.AutomationId="RenoDxInstallUnity" Margin="0,0,10,10"
+                                        IsEnabled="{Binding CanInstallUnityRenoDx}" Visibility="{Binding CanInstallUnityRenoDx, Converter={StaticResource BoolToVis}}"/>
+                            </WrapPanel>
+                        </StackPanel>
+
+                        <Border Grid.Column="1" Width="2" Background="#33FFFFFF" Margin="20,0"/>
+
+                        <StackPanel Grid.Column="2">
+                            <TextBlock Text="Luma" Style="{StaticResource FsSectionTitle}"/>
+                            <TextBlock Text="{Binding LumaStatus}" Style="{StaticResource FsSectionStatus}"/>
+                            <WrapPanel>
+                                <CheckBox Content="Installed" Style="{StaticResource FsToggle}" Margin="0,0,20,10"
+                                          IsChecked="{Binding IsLumaInstalled, Mode=OneWay}"
+                                          Checked="LumaToggle_Checked" Unchecked="LumaToggle_Unchecked"
+                                          AutomationProperties.AutomationId="LumaToggle"/>
+                                <Button Content="Check update" Style="{StaticResource FsButton}" Command="{Binding LumaUpdateCommand}" AutomationProperties.AutomationId="LumaCheckUpdate" Margin="0,0,10,10"/>
+                            </WrapPanel>
+                        </StackPanel>
+                    </Grid>
 
                     <StackPanel Visibility="{Binding ShowDxvkSection, Converter={StaticResource BoolToVis}}">
                         <TextBlock Text="DXVK+Lilium HDR" Style="{StaticResource FsSectionTitle}"/>
