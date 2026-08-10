@@ -40,6 +40,21 @@ namespace HdrUpscaleManager.Tests
         }
 
         [Fact]
+        public void FindGameExecutable_BundledStreamingAssetsExeLargerThanRealGame_IsNeverPicked()
+        {
+            /* Vampire Survivors shape, confirmed live 2026-08-10: a bundled Unity relay helper
+               under StreamingAssets (replication-server.exe, ~29.5MB) outsized the real
+               VampireSurvivors.exe (~672KB), so ReShade deployed next to the helper instead of
+               the game and never loaded. */
+            WriteFile(Path.Combine("Game_Data", "StreamingAssets", "replication-server.exe"), 29_500_000);
+            var expected = WriteFile("VampireSurvivors.exe", 672_000);
+
+            var found = PeInspector.FindGameExecutable(installDirectory);
+
+            Assert.Equal(expected, found);
+        }
+
+        [Fact]
         public void FindGameExecutable_LargeRedistributableInstallerPresent_IsNeverPicked()
         {
             WriteFile(Path.Combine("_CommonRedist", "vc_redist.x64.exe"), 50_000_000);

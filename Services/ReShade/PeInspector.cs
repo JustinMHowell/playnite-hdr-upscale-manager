@@ -89,10 +89,20 @@ namespace HdrUpscaleManager.Services.ReShade
            still reliably smaller than the real game once every subfolder is in play — the
            exclusions below only guard against installer/uninstaller/crash-handler executables
            that could otherwise rival or beat an indie game's exe in size despite never being
-           "the game" under any definition. */
+           "the game" under any definition. Confirmed live 2026-08-10 on Vampire Survivors: a
+           bundled Unity relay helper, VampireSurvivors_Data\StreamingAssets\replication-server.exe
+           (29.5MB), beat the real VampireSurvivors.exe (672KB) outright, so ReShade deployed
+           into StreamingAssets and never loaded. Unity's own StreamingAssets folder is raw
+           asset payload by convention — it never contains the player's own launchable exe —
+           so it's excluded by path rather than guessing at name fragments. */
         private static readonly string[] ExcludedExecutableNameFragments =
         {
             "unins", "redist", "setup", "prereq", "vc_redist", "dxsetup", "crashreport", "crashhandler",
+        };
+
+        private static readonly string[] ExcludedExecutablePathFragments =
+        {
+            "streamingassets",
         };
 
         public static string FindGameExecutable(string installPath)
@@ -105,6 +115,10 @@ namespace HdrUpscaleManager.Services.ReShade
             {
                 var nameLower = file.Name.ToLowerInvariant();
                 if (Array.Exists(ExcludedExecutableNameFragments, fragment => nameLower.Contains(fragment)))
+                    continue;
+
+                var pathLower = file.FullName.ToLowerInvariant();
+                if (Array.Exists(ExcludedExecutablePathFragments, fragment => pathLower.Contains(fragment)))
                     continue;
 
                 if (largest == null || file.Length > largest.Length)
