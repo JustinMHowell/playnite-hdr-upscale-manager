@@ -21,16 +21,20 @@ namespace HdrUpscaleManager.Plugin
         public string AuthorLine => $"By {AuthorName}";
         public string RepoUrl => "https://github.com/matheusfaustino/playnite-hdr-upscale-manager";
         public string RhiRepoUrl => "https://github.com/RankFTW/RHI";
+        public string KenneyUrl => "https://kenney.nl/assets/input-prompts";
 
         [DontSerialize]
         public ICommand OpenRepoCommand { get; }
         [DontSerialize]
         public ICommand OpenRhiRepoCommand { get; }
+        [DontSerialize]
+        public ICommand OpenKenneyUrlCommand { get; }
 
         public HdrUpscaleManagerSettings()
         {
             OpenRepoCommand = new HdrUpscaleManager.UI.RelayCommand(() => OpenUrl(RepoUrl));
             OpenRhiRepoCommand = new HdrUpscaleManager.UI.RelayCommand(() => OpenUrl(RhiRepoUrl));
+            OpenKenneyUrlCommand = new HdrUpscaleManager.UI.RelayCommand(() => OpenUrl(KenneyUrl));
         }
 
         private static void OpenUrl(string url)

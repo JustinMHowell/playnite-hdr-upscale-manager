@@ -29,8 +29,12 @@
         <Button Content="{Binding RepoUrl}" Style="{StaticResource LinkButton}" Command="{Binding OpenRepoCommand}" Margin="0,0,0,16"/>
 
         <TextBlock Text="Credits" FontWeight="Bold" Margin="0,0,0,4"/>
-        <TextBlock Text="This add-on was inspired by RankFTW's RHI and borrows some ideas from it. Thanks, RankFTW!"
+        <TextBlock Text="This add-on was inspired by RankFTW's RHI and borrows some ideas from it. Thanks RankFTW ^^"
                    TextWrapping="Wrap" Margin="0,0,0,4"/>
-        <Button Content="{Binding RhiRepoUrl}" Style="{StaticResource LinkButton}" Command="{Binding OpenRhiRepoCommand}"/>
+        <Button Content="{Binding RhiRepoUrl}" Style="{StaticResource LinkButton}" Command="{Binding OpenRhiRepoCommand}" Margin="0,0,0,16"/>
+
+        <TextBlock Text="Gamepad button icons are from Kenney's Input Prompts pack. Thanks Kenney ^^"
+                   TextWrapping="Wrap" Margin="0,0,0,4"/>
+        <Button Content="{Binding KenneyUrl}" Style="{StaticResource LinkButton}" Command="{Binding OpenKenneyUrlCommand}"/>
     </StackPanel>
 </UserControl>
