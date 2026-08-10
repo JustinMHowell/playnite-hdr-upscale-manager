@@ -24,6 +24,10 @@ namespace HdrUpscaleManager.Plugin
             var isFullscreen = PlayniteApi.ApplicationInfo.Mode == ApplicationMode.Fullscreen;
             UserControl view = isFullscreen ? (UserControl)new ManagerFullscreenView(vm) : new ManagerView(vm);
 
+            // Desktop's ManagerView never renders the gamepad hint and calling this in Desktop
+            // mode crashes — see ManagerViewModel's own constructor comment for why.
+            if (isFullscreen) vm.RefreshGamepadIconStyle();
+
             var window = PlayniteApi.Dialogs.CreateWindow(new WindowCreationOptions
             {
                 ShowMinimizeButton = false,

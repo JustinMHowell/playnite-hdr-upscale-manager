@@ -267,7 +267,13 @@ namespace HdrUpscaleManager.UI
             OptiScalerUninstallCommand = new RelayCommand(() => Run(UninstallOptiScalerAsync), () => !IsBusy && OptiScalerRecords.Get(GameId) != null);
 
             RefreshStatuses();
-            RefreshGamepadIconStyle();
+
+            // NOT called here: RefreshGamepadIconStyle() calls api.GetConnectedControllers(),
+            // which throws NullReferenceException from inside Playnite's own Desktop-mode
+            // implementation (confirmed live 2026-08-10 — Playnite.API.PlayniteApiRoot's
+            // controller subsystem isn't initialized outside Fullscreen). ManagerView (Desktop)
+            // never binds to IsXboxGamepadIcons/IsPlayStationGamepadIcons anyway, so
+            // HdrUpscaleManagerPlugin.OpenManagerWindow calls this only when opening Fullscreen.
 
             if (detectedRenoDxEngine == null || detectedDxvkApi == GraphicsApi.Unknown)
             {
