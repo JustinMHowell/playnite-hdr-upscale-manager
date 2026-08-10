@@ -64,6 +64,15 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Gamepad button glyphs for the Fullscreen manager window's "confirm/close" hint (see
+         ManagerFullscreenView.xaml) — Kenney's Input Prompts pack (kenney.nl/assets/input-prompts),
+         CC0/public domain, no attribution required. Style picked at runtime by
+         GamepadIconStyleDetector; both sets are bundled since which one applies isn't known
+         until a controller is actually connected. -->
+    <Resource Include="Resources\GamepadIcons\*.png" />
+  </ItemGroup>
+
+  <ItemGroup>
     <!-- HdrUpscaleManager.Tests, HdrUpscaleManager.UiTests, GamepadPoc (a local-only, gitignored
          scratch project — see .git/info/exclude — for probing gamepad/UIA behavior, not part of
          the shipped addon), and reference\RHI (a gitignored local clone of upstream RankFTW/RHI

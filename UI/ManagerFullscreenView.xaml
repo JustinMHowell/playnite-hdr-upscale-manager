@@ -102,8 +102,28 @@
             <StackPanel Orientation="Horizontal" Grid.Row="0" Margin="0,0,0,16">
                 <TextBlock Text="{Binding GameName}" FontSize="32" FontWeight="Bold" Foreground="White" VerticalAlignment="Center"/>
                 <TextBlock Text="  •  HDR &amp; Upscale Manager" FontSize="18" Foreground="#88FFFFFF" VerticalAlignment="Bottom" Margin="0,0,0,6"/>
-                <TextBlock Text="A: confirm    •    B: close" Foreground="#88FFFFFF" FontSize="16"
-                           VerticalAlignment="Center" Margin="28,0,0,0"/>
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="28,0,0,0">
+                    <!-- Which set is visible is decided by ManagerViewModel.RefreshGamepadIconStyle
+                         (see GamepadIconStyleDetector) — Playnite has no controller-brand API, so
+                         this is a best-effort guess from the connected device's name, defaulting
+                         to Xbox. Icons: Kenney Input Prompts (CC0, kenney.nl). -->
+                    <StackPanel Orientation="Horizontal"
+                                Visibility="{Binding IsXboxGamepadIcons, Converter={StaticResource BoolToVis}}">
+                        <Image Source="pack://application:,,,/HdrUpscaleManager;component/Resources/GamepadIcons/xbox_a.png" Width="22" Height="22" Margin="0,0,4,0"/>
+                        <TextBlock Text="confirm" Foreground="#88FFFFFF" FontSize="16" VerticalAlignment="Center" Margin="0,0,16,0"
+                                   AutomationProperties.AutomationId="GamepadHintXbox"/>
+                        <Image Source="pack://application:,,,/HdrUpscaleManager;component/Resources/GamepadIcons/xbox_b.png" Width="22" Height="22" Margin="0,0,4,0"/>
+                        <TextBlock Text="close" Foreground="#88FFFFFF" FontSize="16" VerticalAlignment="Center"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal"
+                                Visibility="{Binding IsPlayStationGamepadIcons, Converter={StaticResource BoolToVis}}">
+                        <Image Source="pack://application:,,,/HdrUpscaleManager;component/Resources/GamepadIcons/playstation_a.png" Width="22" Height="22" Margin="0,0,4,0"/>
+                        <TextBlock Text="confirm" Foreground="#88FFFFFF" FontSize="16" VerticalAlignment="Center" Margin="0,0,16,0"
+                                   AutomationProperties.AutomationId="GamepadHintPlayStation"/>
+                        <Image Source="pack://application:,,,/HdrUpscaleManager;component/Resources/GamepadIcons/playstation_b.png" Width="22" Height="22" Margin="0,0,4,0"/>
+                        <TextBlock Text="close" Foreground="#88FFFFFF" FontSize="16" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </StackPanel>
             </StackPanel>
 
             <TextBlock Grid.Row="1" Text="{Binding StatusText}" Foreground="#FFE0BE79" FontSize="19" Margin="0,0,0,16" TextWrapping="Wrap"/>

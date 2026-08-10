@@ -11,6 +11,7 @@ namespace HdrUpscaleManager.Plugin
         /* Tracked so OnControllerButtonStateChanged (raised regardless of which window has OS
            focus) only reacts to gamepad input while our window is actually open. */
         private Window openManagerWindow;
+        private ManagerViewModel openManagerViewModel;
 
         /* Fullscreen gets its own view (ManagerFullscreenView) — Playnite's Fullscreen host
            window for plugin content renders chromeless/transparent, and default WPF controls
@@ -40,7 +41,8 @@ namespace HdrUpscaleManager.Plugin
                 : WindowStartupLocation.CenterOwner;
 
             openManagerWindow = window;
-            window.Closed += (s, e) => openManagerWindow = null;
+            openManagerViewModel = vm;
+            window.Closed += (s, e) => { openManagerWindow = null; openManagerViewModel = null; };
             window.ShowDialog();
         }
 
@@ -63,5 +65,16 @@ namespace HdrUpscaleManager.Plugin
                     break;
             }
         }
+
+        /* Playnite has no controller-brand API — GamepadIconStyleDetector only has a device Name
+           string to go on (see ManagerViewModel.RefreshGamepadIconStyle) — but connect/disconnect
+           IS reported live, so the Fullscreen A/B icon hint can react to a controller being
+           swapped while the window is already open, not just whatever was connected when it
+           opened. */
+        public override void OnControllerConnected(OnControllerConnectedArgs args) =>
+            openManagerViewModel?.SetGamepadIconStyle(args.Controller?.Name);
+
+        public override void OnControllerDisconnected(OnControllerDisconnectedArgs args) =>
+            openManagerViewModel?.HandleControllerDisconnected(args.Controller?.Name);
     }
 }

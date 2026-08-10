@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using System.Windows.Input;
 using HdrUpscaleManager.Models;
@@ -54,6 +55,11 @@ namespace HdrUpscaleManager.UI
 
         public Game Game { get; }
         public string GameName => Game.Name;
+
+        private GamepadIconStyle gamepadIconStyle = GamepadIconStyle.Xbox;
+        private string gamepadIconStyleSourceName;
+        public bool IsXboxGamepadIcons => gamepadIconStyle == GamepadIconStyle.Xbox;
+        public bool IsPlayStationGamepadIcons => gamepadIconStyle == GamepadIconStyle.PlayStation;
 
         public bool CanInstallUnrealRenoDx => detectedRenoDxEngine == null || detectedRenoDxEngine == RenoDxEngine.UnrealEngine;
         public bool CanInstallUnityRenoDx => detectedRenoDxEngine == null || detectedRenoDxEngine == RenoDxEngine.UnityEngine;
@@ -261,6 +267,7 @@ namespace HdrUpscaleManager.UI
             OptiScalerUninstallCommand = new RelayCommand(() => Run(UninstallOptiScalerAsync), () => !IsBusy && OptiScalerRecords.Get(GameId) != null);
 
             RefreshStatuses();
+            RefreshGamepadIconStyle();
 
             if (detectedRenoDxEngine == null || detectedDxvkApi == GraphicsApi.Unknown)
             {
@@ -406,6 +413,43 @@ namespace HdrUpscaleManager.UI
 
             hdrToggleEnabled = new JsonRecordStore<bool>(userDataPath, "hdr_toggle_opt_in.json").Get(GameId);
             OnPropertyChanged(nameof(HdrToggleEnabled));
+        }
+
+        /* Called only at construction — re-derives from the live connected-controller list,
+           since there's no specific "just connected" controller to read a name from yet. Live
+           updates while the window is open go through SetGamepadIconStyle/HandleControllerDisconnected
+           below instead of calling this again. */
+        public void RefreshGamepadIconStyle()
+        {
+            var controllerName = api.GetConnectedControllers()?.FirstOrDefault(c => c.Enabled)?.Name;
+            SetGamepadIconStyle(controllerName);
+        }
+
+        /* Called from HdrUpscaleManagerPlugin.OnControllerConnected with the newly-connected
+           controller's own name — not a fresh GetConnectedControllers() query, which confirmed
+           live 2026-08-10 can still return a just-disconnected controller for a moment (see
+           HandleControllerDisconnected below for the matching problem on the other side). */
+        public void SetGamepadIconStyle(string controllerName)
+        {
+            gamepadIconStyleSourceName = controllerName;
+            gamepadIconStyle = GamepadIconStyleDetector.Detect(controllerName);
+            OnPropertyChanged(nameof(IsXboxGamepadIcons));
+            OnPropertyChanged(nameof(IsPlayStationGamepadIcons));
+        }
+
+        /* Called from HdrUpscaleManagerPlugin.OnControllerDisconnected. Confirmed live 2026-08-10
+           swapping a controller fires OnControllerConnected for the new one immediately followed
+           by OnControllerDisconnected for the old one (2ms apart) — a disconnect handler that
+           unconditionally re-queries GetConnectedControllers() can catch it in a stale state and
+           clobber the icon style the connect event JUST set correctly. Only re-deriving when the
+           controller that disconnected is the one actually driving the current icon avoids that:
+           an unrelated controller disconnecting is a no-op, and the real "last controller unplugged"
+           case (disconnected name matches) still correctly falls through to Xbox's default. */
+        public void HandleControllerDisconnected(string disconnectedControllerName)
+        {
+            if (!string.Equals(disconnectedControllerName, gamepadIconStyleSourceName, StringComparison.Ordinal)) return;
+
+            RefreshGamepadIconStyle();
         }
 
         private async void Run(Func<Task> action)
