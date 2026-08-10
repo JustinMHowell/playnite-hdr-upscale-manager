@@ -99,14 +99,14 @@
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
 
-            <StackPanel Orientation="Horizontal" Grid.Row="0" Margin="0,0,0,16">
-                <TextBlock Text="{Binding GameName}" FontSize="32" FontWeight="Bold" Foreground="White" VerticalAlignment="Center"/>
-                <TextBlock Text="  •  HDR &amp; Upscale Manager" FontSize="18" Foreground="#88FFFFFF" VerticalAlignment="Bottom" Margin="0,0,0,6"/>
-                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="28,0,0,0">
-                    <!-- Which set is visible is decided by ManagerViewModel.RefreshGamepadIconStyle
-                         (see GamepadIconStyleDetector) — Playnite has no controller-brand API, so
-                         this is a best-effort guess from the connected device's name, defaulting
-                         to Xbox. Icons: Kenney Input Prompts (CC0, kenney.nl). -->
+            <DockPanel Grid.Row="0" Margin="0,0,0,16" LastChildFill="True">
+                <!-- Docked right, declared first so the title StackPanel (last child, undocked)
+                     fills the remaining space per LastChildFill rather than trailing it. Which
+                     set is visible is decided by ManagerViewModel.RefreshGamepadIconStyle (see
+                     GamepadIconStyleDetector) — Playnite has no controller-brand API, so this is
+                     a best-effort guess from the connected device's name, defaulting to Xbox.
+                     Icons: Kenney Input Prompts (CC0, kenney.nl). -->
+                <StackPanel Orientation="Horizontal" DockPanel.Dock="Right" VerticalAlignment="Center">
                     <StackPanel Orientation="Horizontal"
                                 Visibility="{Binding IsXboxGamepadIcons, Converter={StaticResource BoolToVis}}">
                         <Image Source="pack://application:,,,/HdrUpscaleManager;component/Resources/GamepadIcons/xbox_a.png" Width="22" Height="22" Margin="0,0,4,0"/>
@@ -124,7 +124,11 @@
                         <TextBlock Text="close" Foreground="#88FFFFFF" FontSize="16" VerticalAlignment="Center"/>
                     </StackPanel>
                 </StackPanel>
-            </StackPanel>
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="{Binding GameName}" FontSize="32" FontWeight="Bold" Foreground="White" VerticalAlignment="Center"/>
+                    <TextBlock Text="  •  HDR &amp; Upscale Manager" FontSize="18" Foreground="#88FFFFFF" VerticalAlignment="Bottom" Margin="0,0,0,6"/>
+                </StackPanel>
+            </DockPanel>
 
             <TextBlock Grid.Row="1" Text="{Binding StatusText}" Foreground="#FFE0BE79" FontSize="19" Margin="0,0,0,16" TextWrapping="Wrap"/>
 
