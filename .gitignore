@@ -37,6 +37,10 @@ _ReSharper*/
 *.[Rr]e[Ss]harper
 *.DotSettings.user
 
+# IDE XAML design-time build scratch projects (VS/Rider auto-generate these with a random
+# suffix next to the real .csproj — transient, safe to delete, never meant to be committed)
+*_wpftmp.csproj
+
 # Test results / coverage
 [Tt]est[Rr]esult*/
 [Bb]uild[Ll]og.*
