@@ -1,5 +1,6 @@
 using System.IO;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using SharpCompress.Archives.SevenZip;
 
 namespace HdrUpscaleManager.Services.Addons
@@ -10,6 +11,15 @@ namespace HdrUpscaleManager.Services.Addons
     public static class SevenZipExtractor
     {
         public static void ExtractAll(byte[] archiveBytes, string destinationDirectory)
+        {
+            using (CompressionAssemblyResolver.BeginExtraction())
+                ExtractAllCore(archiveBytes, destinationDirectory);
+        }
+
+        // Keep SharpCompress references out of the bootstrap method's JIT compilation:
+        // its dependencies must not be bound until our resolver has been registered.
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private static void ExtractAllCore(byte[] archiveBytes, string destinationDirectory)
         {
             using (var stream = new MemoryStream(archiveBytes))
             using (var archive = SevenZipArchive.Open(stream))
