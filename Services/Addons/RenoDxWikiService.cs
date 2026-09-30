@@ -76,7 +76,12 @@ namespace HdrUpscaleManager.Services.Addons
                    page (a notice, a table of contents) is skipped. */
                 if (!hasLinksCol && !(hasStatusCol && headerCells.Count >= 3)) continue;
 
-                mods.AddRange(ParseModTable(table, headerTexts));
+                var heading = table.SelectSingleNode("preceding::*[self::h1 or self::h2 or self::h3 or self::h4][1]");
+                var section = heading != null ? Clean(heading.InnerText) : null;
+
+                var tableMods = ParseModTable(table, headerTexts);
+                foreach (var mod in tableMods) mod.Section = section;
+                mods.AddRange(tableMods);
             }
 
             return mods;
@@ -254,6 +259,10 @@ namespace HdrUpscaleManager.Services.Addons
                 Log.Warn(ex, "Failed to write RenoDX wiki mod cache to disk.");
             }
         }
+
+        /* Sync, no-network read of the last successful fetch — lets the manager window show wiki
+           notes instantly on open while FetchAllAsync refreshes them in the background. */
+        public List<RenoDxWikiMod> TryGetCachedMods() => LoadCached();
 
         private List<RenoDxWikiMod> LoadCached()
         {

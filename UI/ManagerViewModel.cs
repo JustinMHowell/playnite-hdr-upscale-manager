@@ -52,6 +52,7 @@ namespace HdrUpscaleManager.UI
         private readonly LumaPrerequisitesManifest lumaPrerequisitesManifest;
         private OptiScalerWikiData optiScalerWikiData;
         private bool optiScalerWikiLookupInProgress;
+        private List<RenoDxWikiMod> renoDxWikiMods;
 
         public Game Game { get; }
         public string GameName => Game.Name;
@@ -284,6 +285,41 @@ namespace HdrUpscaleManager.UI
             optiScalerWikiData = new OptiScalerWikiService(Path.Combine(userDataPath, "OptiScalerWikiCache")).TryGetCachedData();
             optiScalerWikiLookupInProgress = true;
             _ = RefreshOptiScalerWikiAsync();
+
+            renoDxWikiMods = new RenoDxWikiService(Path.Combine(userDataPath, "RenoDxWikiCache")).TryGetCachedMods();
+            _ = RefreshRenoDxWikiAsync();
+        }
+
+        /* Same shape as RefreshOptiScalerWikiAsync — cached notes already showed instantly via
+           TryGetCachedMods above; this only refreshes them. Purely informational. */
+        private async Task RefreshRenoDxWikiAsync()
+        {
+            try
+            {
+                var cacheDir = Path.Combine(userDataPath, "RenoDxWikiCache");
+                renoDxWikiMods = await new RenoDxWikiService(cacheDir).FetchAllAsync().ConfigureAwait(true);
+            }
+            catch (Exception ex)
+            {
+                Log.Warn(ex, $"RenoDX wiki fetch failed for '{GameName}'.");
+            }
+            finally
+            {
+                OnPropertyChanged(nameof(RenoDxWikiNotesText));
+            }
+        }
+
+        /* Null (hides the TextBlock) when the wiki has nothing to say about this game — most
+           games have no notes, and a "no notes" line on every one of them would just be noise. */
+        public string RenoDxWikiNotesText
+        {
+            get
+            {
+                if (renoDxWikiMods == null || renoDxWikiMods.Count == 0) return null;
+
+                var notes = RenoDxGameMatcher.FindWikiNotes(GameName, renoDxWikiMods, cachedManifest?.WikiNameOverrides);
+                return notes.Count > 0 ? "RenoDX wiki notes:\n" + string.Join("\n", notes) : null;
+            }
         }
 
         /* Fire-and-forget from the constructor, same shape as RefreshDetectionFromPcGamingWikiAsync

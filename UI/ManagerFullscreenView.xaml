@@ -205,6 +205,8 @@
                         <StackPanel Grid.Column="0">
                             <TextBlock Text="RenoDX" Style="{StaticResource FsSectionTitle}"/>
                             <TextBlock Text="{Binding RenoDxStatus}" Style="{StaticResource FsSectionStatus}"/>
+                            <TextBlock Text="{Binding RenoDxWikiNotesText}" Style="{StaticResource FsSectionStatus}" AutomationProperties.AutomationId="RenoDxWikiNotesText"
+                                       Visibility="{Binding RenoDxWikiNotesText, Converter={StaticResource StringNotEmptyToVis}}"/>
                             <WrapPanel Margin="0,0,0,8">
                                 <CheckBox Content="Installed" Style="{StaticResource FsToggle}" Margin="0,0,20,10"
                                           IsChecked="{Binding IsRenoDxInstalled, Mode=OneWay}"
