@@ -128,6 +128,21 @@ namespace HdrUpscaleManager.Services.ReShade
             return largest?.FullName;
         }
 
+        /* User-facing reason FindGameExecutable came back null. An unreachable folder usually
+           means the drive holding the game isn't mounted, not that the game has no exe —
+           confirmed live 2026-09-30 on RuneScape: Dragonwilds, an Xbox app game whose
+           C:\Program Files\WindowsApps\... folder is a junction to X:\WindowsApps on an external
+           drive that doesn't remount itself after a reboot. */
+        public static string DescribeMissingExecutable(string installPath)
+        {
+            if (string.IsNullOrEmpty(installPath) || !Directory.Exists(installPath))
+                return $"Can't reach the install folder '{installPath}'. If the game is on an external or secondary " +
+                    "drive (Xbox app games can live on a separate drive behind this path), make sure that drive is " +
+                    "connected and mounted, then try again.";
+
+            return $"No executable found in the install folder '{installPath}'.";
+        }
+
         /* Every installer (OptiScaler/ReShade/DXVK/RenoDX/Luma) used to deploy straight into
            installPath itself — wrong whenever the real, loadable exe FindGameExecutable finds
            sits in a subfolder (e.g. Unreal Engine's Binaries\Win64\), since Windows only checks
@@ -249,11 +264,75 @@ namespace HdrUpscaleManager.Services.ReShade
                     return new PeInspectionResult { Is64Bit = is64Bit, Api = bestApi };
                 }
             }
+            catch (UnauthorizedAccessException)
+            {
+                /* Xbox app / Game Pass games: Windows denies reading the game's own .exe outright
+                   (execute-only — confirmed live 2026-09-30 on Blue Prince, and 2026-09-23 on Dune:
+                   Awakening, where every ReShade install failed on it), from both the WindowsApps
+                   path Playnite reports and the C:\XboxGames\...\Content folder it's a junction to.
+                   Everything else in the folder stays readable and writable, so only this header
+                   read needs a way around it. */
+                var fromManifest = InspectFromPackageManifest(exePath);
+                if (fromManifest != null)
+                {
+                    // Inspect runs many times per install/status refresh — note it once per exe.
+                    bool firstTime;
+                    lock (LoggedManifestFallbacks) firstTime = LoggedManifestFallbacks.Add(exePath);
+                    if (firstTime)
+                        Log.Info($"'{exePath}' isn't readable (Xbox app package) — took bitness from its appxmanifest.xml; graphics API unknown.");
+                    return fromManifest;
+                }
+
+                Log.Warn($"Failed to inspect PE header for '{exePath}': access denied, and no appxmanifest.xml found to fall back on.");
+                return null;
+            }
             catch (Exception ex)
             {
                 Log.Warn(ex, $"Failed to inspect PE header for '{exePath}'.");
                 return null;
             }
+        }
+
+        private const int ManifestSearchDepth = 8;
+
+        private static readonly HashSet<string> LoggedManifestFallbacks = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        /* Walks up from the exe to the package root (a UE game's exe sits several folders deep,
+           e.g. DuneSandbox\Binaries\WinGDK\) looking for the appxmanifest.xml every Xbox app
+           package carries, and reads bitness from its Identity ProcessorArchitecture. The API
+           can't be derived from the manifest, so it's always Unknown — callers already treat
+           that as "ask the manifest override / PCGamingWiki, else default". */
+        internal static PeInspectionResult InspectFromPackageManifest(string exePath)
+        {
+            var dir = Path.GetDirectoryName(exePath);
+            for (var depth = 0; dir != null && depth < ManifestSearchDepth; depth++, dir = Path.GetDirectoryName(dir))
+            {
+                var manifestPath = Path.Combine(dir, "appxmanifest.xml");
+                if (!File.Exists(manifestPath)) continue;
+
+                try
+                {
+                    var match = System.Text.RegularExpressions.Regex.Match(
+                        File.ReadAllText(manifestPath),
+                        @"<Identity\b[^>]*\bProcessorArchitecture\s*=\s*""([^""]+)""",
+                        System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                    if (!match.Success) return null;
+
+                    var arch = match.Groups[1].Value;
+                    return new PeInspectionResult
+                    {
+                        Is64Bit = !arch.Equals("x86", StringComparison.OrdinalIgnoreCase),
+                        Api = GraphicsApi.Unknown
+                    };
+                }
+                catch (Exception ex)
+                {
+                    Log.Warn(ex, $"Failed to read '{manifestPath}'.");
+                    return null;
+                }
+            }
+
+            return null;
         }
 
         private static string ReadDllName(FileStream stream, List<Section> sections, uint nameRva)

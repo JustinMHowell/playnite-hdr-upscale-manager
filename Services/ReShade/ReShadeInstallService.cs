@@ -134,7 +134,7 @@ namespace HdrUpscaleManager.Services.ReShade
 
         /* Version-resource check only — no ReShade.ini fallback, for when the answer decides
            whether a file gets backed up rather than just whether ReShade counts as installed. */
-        private static bool IsReShadeBinary(string dllPath)
+        internal static bool IsReShadeBinary(string dllPath)
         {
             try
             {
@@ -169,7 +169,7 @@ namespace HdrUpscaleManager.Services.ReShade
         {
             var exePath = PeInspector.FindGameExecutable(gameInstallPath);
             if (exePath == null)
-                return Fail("No executable found in the install folder.");
+                return Fail(PeInspector.DescribeMissingExecutable(gameInstallPath));
 
             var info = PeInspector.Inspect(exePath);
             if (info == null)
@@ -256,7 +256,7 @@ namespace HdrUpscaleManager.Services.ReShade
         public static ReShadeUninstallResult Uninstall(string gameInstallPath, GraphicsApi? apiOverride = null)
         {
             var exePath = PeInspector.FindGameExecutable(gameInstallPath);
-            if (exePath == null) return FailUninstall("No executable found in the install folder.");
+            if (exePath == null) return FailUninstall(PeInspector.DescribeMissingExecutable(gameInstallPath));
 
             var deployDir = Path.GetDirectoryName(exePath) ?? gameInstallPath;
 

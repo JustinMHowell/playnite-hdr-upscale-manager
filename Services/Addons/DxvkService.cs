@@ -60,7 +60,7 @@ namespace HdrUpscaleManager.Services.Addons
         public static async Task<DxvkInstallResult> InstallAsync(string gameInstallPath, string cacheDirectory, GraphicsApi? apiOverride = null)
         {
             var exePath = PeInspector.FindGameExecutable(gameInstallPath);
-            if (exePath == null) return Fail("No executable found in the install folder.");
+            if (exePath == null) return Fail(PeInspector.DescribeMissingExecutable(gameInstallPath));
 
             var info = PeInspector.Inspect(exePath);
             if (info == null) return Fail("Could not read the game executable's PE header.");

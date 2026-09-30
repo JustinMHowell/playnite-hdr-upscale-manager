@@ -137,7 +137,7 @@ namespace HdrUpscaleManager.Services.Addons
             bool installDlssDll = true)
         {
             var exePath = PeInspector.FindGameExecutable(gameInstallPath);
-            if (exePath == null) return Fail("No executable found in the install folder.");
+            if (exePath == null) return Fail(PeInspector.DescribeMissingExecutable(gameInstallPath));
 
             var info = PeInspector.Inspect(exePath);
             if (info == null) return Fail("Could not read the game executable's PE header.");
@@ -251,6 +251,16 @@ namespace HdrUpscaleManager.Services.Addons
            to claim for itself — the one case that actually needs the coexistence dance below. */
         internal static bool ShouldDisplaceReShade(string gameInstallPath, string dllName, GraphicsApi api)
         {
+            /* The file's own version resource settles it regardless of API. Needed because an
+               Unknown API maps to no proxy name here, while ReShadeInstallService.InstallAsync
+               defaults Unknown to dxgi.dll anyway — confirmed live 2026-09-30 on RuneScape:
+               Dragonwilds (Xbox app, exe unreadable so API Unknown): ReShade's dxgi.dll got
+               backed up as "the game's original" instead of moved to ReShadeCoexistName, and
+               OptiScaler's LoadReshade found nothing to load. */
+            var existingPath = Path.Combine(gameInstallPath, dllName);
+            if (File.Exists(existingPath) && ReShadeInstallService.IsReShadeBinary(existingPath))
+                return true;
+
             var reShadeProxyName = ReShadeProxyDll.GetProxyDllName(api);
             return string.Equals(reShadeProxyName, dllName, StringComparison.OrdinalIgnoreCase) &&
                 ReShadeInstallService.IsInstalled(gameInstallPath, api);
