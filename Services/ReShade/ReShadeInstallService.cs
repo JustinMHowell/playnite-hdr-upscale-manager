@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Net.Http;
 using System.Threading.Tasks;
@@ -78,12 +79,67 @@ namespace HdrUpscaleManager.Services.ReShade
             if (OptiScalerService.IsInstalled(deployDir))
                 return File.Exists(Path.Combine(deployDir, OptiScalerService.ReShadeCoexistName));
 
-            var api = apiOverride ?? PeInspector.Inspect(exePath)?.Api;
-            var proxyDllName = api != null ? ReShadeProxyDll.GetProxyDllName(api.Value) : null;
-            if (proxyDllName != null && File.Exists(Path.Combine(deployDir, proxyDllName)))
+            if (FindInstalledProxyDll(exePath, deployDir, apiOverride) != null)
                 return true;
 
             return File.Exists(Path.Combine(deployDir, OptiScalerService.ReShadeCoexistName));
+        }
+
+        /* Every file name a drop-in ReShade install can live under — whatever
+           ReShadeProxyDll.GetProxyDllName can return, plus the d3d10/d3d11 names ReShade's own
+           setup tool also offers for manual installs. */
+        private static readonly string[] CandidateProxyDllNames =
+        {
+            "dxgi.dll", "d3d9.dll", "d3d10.dll", "d3d11.dll", "opengl32.dll",
+        };
+
+        /* Resolves which proxy DLL in deployDir is ReShade. The API-matched name is trusted on
+           existence alone, same as before. Every other candidate name must also be verified as
+           ReShade (see LooksLikeReShade), since dxgi.dll/d3d11.dll may just as well be DXVK's or
+           the game's own. That second pass is what lets a manual ReShade install be recognized
+           at all when PE inspection reads the API as GraphicsApi.Unknown — confirmed across
+           multiple games, which previously only ever checked ReShadeCoexistName in that case
+           and so sent EnsureReShadeInstalledForRenoDxAsync into a reinstall that then failed. */
+        private static string FindInstalledProxyDll(string exePath, string deployDir, GraphicsApi? apiOverride)
+        {
+            var api = apiOverride ?? PeInspector.Inspect(exePath)?.Api;
+            var expectedName = api != null ? ReShadeProxyDll.GetProxyDllName(api.Value) : null;
+            if (expectedName != null)
+            {
+                var expectedPath = Path.Combine(deployDir, expectedName);
+                if (File.Exists(expectedPath)) return expectedPath;
+            }
+
+            foreach (var name in CandidateProxyDllNames)
+            {
+                if (string.Equals(name, expectedName, StringComparison.OrdinalIgnoreCase)) continue;
+
+                var path = Path.Combine(deployDir, name);
+                if (File.Exists(path) && LooksLikeReShade(path)) return path;
+            }
+
+            return null;
+        }
+
+        /* ReShade's own DLL carries "ReShade" in its version resource — that alone settles it.
+           ReShade.ini beside it is the fallback: ReShade writes it on first launch, and its setup
+           tool writes it on a manual install, while DXVK and the game's own DLLs never do. */
+        internal static bool LooksLikeReShade(string dllPath)
+        {
+            try
+            {
+                var info = FileVersionInfo.GetVersionInfo(dllPath);
+                if ((info.ProductName?.IndexOf("ReShade", StringComparison.OrdinalIgnoreCase) ?? -1) >= 0 ||
+                    (info.FileDescription?.IndexOf("ReShade", StringComparison.OrdinalIgnoreCase) ?? -1) >= 0)
+                    return true;
+            }
+            catch (Exception ex)
+            {
+                Log.Warn(ex, $"Could not read version info for '{dllPath}'.");
+            }
+
+            var dir = Path.GetDirectoryName(dllPath);
+            return dir != null && File.Exists(Path.Combine(dir, "ReShade.ini"));
         }
 
         /* OptiScaler already claims proxyDllName for itself when present — deploy under the
@@ -118,6 +174,18 @@ namespace HdrUpscaleManager.Services.ReShade
 
             var api = apiOverride ?? info.Api;
             var proxyDllName = ReShadeProxyDll.GetProxyDllName(api);
+
+            /* Unknown means nothing (import table, manifest override, PCGamingWiki) could say
+               which API this game uses — not that it uses one ReShade can't hook. dxgi.dll covers
+               D3D10/11/12, which is nearly every game RenoDX targets, so it's a far better bet
+               than refusing outright. Confirmed across multiple games whose PE imports never
+               name a graphics DLL at all (see this method's own doc comment). */
+            if (proxyDllName == null && api == GraphicsApi.Unknown)
+            {
+                proxyDllName = "dxgi.dll";
+                Log.Warn($"Graphics API not detected for '{exePath}' — defaulting ReShade to dxgi.dll (D3D10/11/12).");
+            }
+
             if (proxyDllName == null)
                 return Fail($"{api} isn't supported by a drop-in ReShade install.");
 
@@ -188,13 +256,8 @@ namespace HdrUpscaleManager.Services.ReShade
             if (OptiScalerService.IsInstalled(deployDir))
                 return FailUninstall("OptiScaler is installed and hosts ReShade under a renamed DLL for coexistence — uninstall OptiScaler first.");
 
-            var api = apiOverride ?? PeInspector.Inspect(exePath)?.Api;
-            var proxyDllName = api != null ? ReShadeProxyDll.GetProxyDllName(api.Value) : null;
-            if (proxyDllName == null)
-                return FailUninstall("Could not determine which DLL to remove.");
-
-            var targetPath = Path.Combine(deployDir, proxyDllName);
-            if (!File.Exists(targetPath))
+            var targetPath = FindInstalledProxyDll(exePath, deployDir, apiOverride);
+            if (targetPath == null)
                 return FailUninstall("ReShade doesn't appear to be installed.");
 
             try
