@@ -89,8 +89,43 @@ namespace HdrUpscaleManager.Services.Addons
            deploy directory itself (see PeInspector.ResolveDeployDirectory) rather than assuming
            gameInstallPath IS that directory — safe to call with either the raw Playnite install
            root or an already-resolved deploy directory, since re-resolving the latter is a no-op. */
-        public static bool IsInstalled(string gameInstallPath) =>
-            File.Exists(Path.Combine(PeInspector.ResolveDeployDirectory(gameInstallPath), "OptiScaler.ini"));
+        public static bool IsInstalled(string gameInstallPath)
+        {
+            var deployDir = PeInspector.ResolveDeployDirectory(gameInstallPath);
+            return File.Exists(Path.Combine(deployDir, "OptiScaler.ini")) && FindProxyDll(deployDir) != null;
+        }
+
+        /* Every proxy name OptiScaler can be deployed under (ResolveDllName's defaults plus the
+           names its own docs list for manifest overrides). */
+        private static readonly string[] CandidateProxyDllNames =
+        {
+            "dxgi.dll", "winmm.dll", "version.dll", "dbghelp.dll", "d3d12.dll", "wininet.dll", "winhttp.dll", "OptiScaler.asi",
+        };
+
+        /* The ini alone isn't proof OptiScaler is still there — DeployIni deliberately preserves
+           an existing one, so it's the file most likely to outlive an uninstall (confirmed live
+           2026-09-30: a leftover OptiScaler.ini on Atomic Heart and METAL EDEN kept blocking
+           ReShade's uninstall after OptiScaler itself was gone). Also requires a proxy DLL that
+           is actually OptiScaler — see IsOptiScalerBinary for how that's decided. */
+        internal static string FindProxyDll(string deployDir)
+        {
+            foreach (var name in CandidateProxyDllNames)
+            {
+                var path = Path.Combine(deployDir, name);
+                if (File.Exists(path) && IsOptiScalerBinary(path)) return path;
+            }
+
+            return null;
+        }
+
+        /* OptiScaler.dll's version resource names it as "OptiScaler". A file with some other
+           product name (ReShade, Microsoft's own dxgi.dll) is definitely not it; one with no
+           version resource at all can't be ruled out, so it's given the benefit of the doubt. */
+        internal static bool IsOptiScalerBinary(string path)
+        {
+            var product = FileBackup.ProductNameOf(path);
+            return product.Length == 0 || product.IndexOf("OptiScaler", StringComparison.OrdinalIgnoreCase) >= 0;
+        }
 
         public static async Task<OptiScalerInstallResult> InstallAsync(
             string gameInstallPath,
@@ -156,7 +191,7 @@ namespace HdrUpscaleManager.Services.Addons
                     if (SkipTopLevelExtensions.Contains(Path.GetExtension(name))) continue;
 
                     var destPath = Path.Combine(deployDir, name);
-                    FileBackup.BackupIfNeeded(destPath);
+                    FileBackup.BackupIfNeeded(destPath, existing => FileBackup.FilesEqual(existing, filePath));
                     File.Copy(filePath, destPath, overwrite: true);
                     installedFiles.Add(name);
                 }
@@ -171,8 +206,13 @@ namespace HdrUpscaleManager.Services.Addons
                 }
 
                 var targetDllPath = Path.Combine(deployDir, dllName);
-                FileBackup.BackupIfNeeded(targetDllPath);
-                File.Copy(Path.Combine(stagingRoot, "OptiScaler.dll"), targetDllPath, overwrite: true);
+                var sourceDllPath = Path.Combine(stagingRoot, "OptiScaler.dll");
+                /* Positive identification only here (not IsOptiScalerBinary's benefit of the doubt)
+                   — an unidentified file in the proxy slot may well be the game's own. */
+                FileBackup.BackupIfNeeded(targetDllPath, existing =>
+                    FileBackup.FilesEqual(existing, sourceDllPath) ||
+                    FileBackup.ProductNameOf(existing).IndexOf("OptiScaler", StringComparison.OrdinalIgnoreCase) >= 0);
+                File.Copy(sourceDllPath, targetDllPath, overwrite: true);
                 installedFiles.Add(dllName);
             }
             catch (Exception ex)

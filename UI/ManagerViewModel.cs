@@ -448,9 +448,14 @@ namespace HdrUpscaleManager.UI
             OnPropertyChanged(nameof(CanToggleDxvk));
 
             var optiScaler = OptiScalerRecords.Get(GameId);
+            /* No record doesn't guarantee nothing's on disk — a manual install, another tool, or
+               leftovers from before FileBackup stopped backing up OptiScaler's own files all look
+               like "installed" to ReShade's coexistence checks, so say so rather than contradict them. */
             OptiScalerStatus = optiScaler != null
                 ? $"Installed ({optiScaler.Version}, {(optiScaler.DlssInputs ? "DLSS-only mode" : "native upscaler mode")})"
-                : "Not installed.";
+                : !string.IsNullOrEmpty(Game.InstallDirectory) && OptiScalerService.IsInstalled(Game.InstallDirectory)
+                    ? "Not installed by this add-on, but OptiScaler files are present in the game folder (manual install or leftovers) — remove them by hand to uninstall."
+                    : "Not installed.";
             IsOptiScalerInstalled = optiScaler != null;
 
             hdrToggleEnabled = new JsonRecordStore<bool>(userDataPath, "hdr_toggle_opt_in.json").Get(GameId);
@@ -1126,16 +1131,27 @@ namespace HdrUpscaleManager.UI
                     return;
                 }
 
+                /* A reinstall over an existing record keeps everything the earlier install
+                   tracked — notably OptiScaler.ini, which DeployIni preserves (and so doesn't
+                   report) the second time round. Replacing the list outright made Uninstall
+                   leave that ini behind, where it kept ReShade believing OptiScaler was present. */
+                var previous = OptiScalerRecords.Get(GameId);
+                var samePath = previous != null &&
+                    string.Equals(previous.InstallPath, result.DeployDirectory, StringComparison.OrdinalIgnoreCase);
+                var installedFiles = samePath
+                    ? (previous.InstalledFiles ?? new List<string>()).Union(result.InstalledFiles, StringComparer.OrdinalIgnoreCase).ToList()
+                    : result.InstalledFiles;
+
                 OptiScalerRecords.Set(GameId, new OptiScalerInstalledRecord
                 {
                     GameId = GameId,
                     GameName = GameName,
                     InstallPath = result.DeployDirectory,
                     DllName = result.DllName,
-                    InstalledFiles = result.InstalledFiles,
+                    InstalledFiles = installedFiles,
                     DlssInputs = dlssInputs,
-                    OptiPatcherInstalled = result.OptiPatcherInstalled,
-                    DlssDllInstalled = result.DlssDllInstalled,
+                    OptiPatcherInstalled = result.OptiPatcherInstalled || (samePath && previous.OptiPatcherInstalled),
+                    DlssDllInstalled = result.DlssDllInstalled || (samePath && previous.DlssDllInstalled),
                     Version = result.Version,
                     InstalledAtUtc = DateTimeOffset.UtcNow
                 });

@@ -126,20 +126,27 @@ namespace HdrUpscaleManager.Services.ReShade
            tool writes it on a manual install, while DXVK and the game's own DLLs never do. */
         internal static bool LooksLikeReShade(string dllPath)
         {
+            if (IsReShadeBinary(dllPath)) return true;
+
+            var dir = Path.GetDirectoryName(dllPath);
+            return dir != null && File.Exists(Path.Combine(dir, "ReShade.ini"));
+        }
+
+        /* Version-resource check only — no ReShade.ini fallback, for when the answer decides
+           whether a file gets backed up rather than just whether ReShade counts as installed. */
+        private static bool IsReShadeBinary(string dllPath)
+        {
             try
             {
                 var info = FileVersionInfo.GetVersionInfo(dllPath);
-                if ((info.ProductName?.IndexOf("ReShade", StringComparison.OrdinalIgnoreCase) ?? -1) >= 0 ||
-                    (info.FileDescription?.IndexOf("ReShade", StringComparison.OrdinalIgnoreCase) ?? -1) >= 0)
-                    return true;
+                return (info.ProductName?.IndexOf("ReShade", StringComparison.OrdinalIgnoreCase) ?? -1) >= 0 ||
+                    (info.FileDescription?.IndexOf("ReShade", StringComparison.OrdinalIgnoreCase) ?? -1) >= 0;
             }
             catch (Exception ex)
             {
                 Log.Warn(ex, $"Could not read version info for '{dllPath}'.");
+                return false;
             }
-
-            var dir = Path.GetDirectoryName(dllPath);
-            return dir != null && File.Exists(Path.Combine(dir, "ReShade.ini"));
         }
 
         /* OptiScaler already claims proxyDllName for itself when present — deploy under the
@@ -254,9 +261,17 @@ namespace HdrUpscaleManager.Services.ReShade
             var deployDir = Path.GetDirectoryName(exePath) ?? gameInstallPath;
 
             if (OptiScalerService.IsInstalled(deployDir))
-                return FailUninstall("OptiScaler is installed and hosts ReShade under a renamed DLL for coexistence — uninstall OptiScaler first.");
+                return FailUninstall(
+                    $"OptiScaler is present in '{deployDir}' ({Path.GetFileName(OptiScalerService.FindProxyDll(deployDir))} + OptiScaler.ini) and is " +
+                    "hosting ReShade — uninstall OptiScaler first. If this add-on shows OptiScaler as not installed, " +
+                    "those files weren't installed by it (or are left over) and need removing by hand.");
 
+            /* Falls back to ReShadeCoexistName the same way IsInstalled does — ReShade stays
+               under that name if OptiScaler goes away without renaming it back. */
             var targetPath = FindInstalledProxyDll(exePath, deployDir, apiOverride);
+            var coexistPath = Path.Combine(deployDir, OptiScalerService.ReShadeCoexistName);
+            if (targetPath == null && File.Exists(coexistPath))
+                targetPath = coexistPath;
             if (targetPath == null)
                 return FailUninstall("ReShade doesn't appear to be installed.");
 
@@ -369,9 +384,15 @@ namespace HdrUpscaleManager.Services.ReShade
             }
         }
 
+        /* An existing ReShade DLL (an earlier install of ours, or a manual one) is simply
+           overwritten — backing it up as ".original" would make Uninstall restore ReShade
+           instead of removing it, the same trap FileBackup.BackupIfNeeded's own doc comment
+           describes for OptiScaler (and seen live on Atomic Heart as a ReShade64.dll.original
+           byte-identical to ReShade64.dll). */
         private static void BackupIfNeeded(string targetPath)
         {
             if (!File.Exists(targetPath)) return;
+            if (IsReShadeBinary(targetPath)) return;
 
             var backupPath = targetPath + ".original";
             if (File.Exists(backupPath)) return;

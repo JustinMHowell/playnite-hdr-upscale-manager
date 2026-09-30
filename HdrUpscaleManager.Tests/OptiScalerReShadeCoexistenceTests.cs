@@ -41,11 +41,36 @@ namespace HdrUpscaleManager.Tests
         // ── OptiScalerService.IsInstalled ───────────────────────────────────────
 
         [Fact]
-        public void OptiScalerIsInstalled_IniPresent_ReturnsTrue()
+        public void OptiScalerIsInstalled_IniAndProxyDllPresent_ReturnsTrue()
         {
             WriteFile("OptiScaler.ini");
+            WriteFile("dxgi.dll", "optiscaler bytes");
 
             Assert.True(OptiScalerService.IsInstalled(directory));
+        }
+
+        [Fact]
+        public void OptiScalerIsInstalled_OnlyLeftoverIni_ReturnsFalse()
+        {
+            // Regression for Atomic Heart / METAL EDEN (confirmed live 2026-09-30): an ini left
+            // behind after OptiScaler itself was removed kept ReShade's uninstall blocked.
+            WriteFile("OptiScaler.ini");
+
+            Assert.False(OptiScalerService.IsInstalled(directory));
+        }
+
+        [Fact]
+        public void ReShadeUninstall_OnlyLeftoverOptiScalerIni_IsNotBlocked()
+        {
+            // Atomic Heart's real leftover state: OptiScaler gone, its ini and ReShade still
+            // sitting under the coexistence name.
+            WriteFile("OptiScaler.ini");
+            WriteFile(OptiScalerService.ReShadeCoexistName, "reshade bytes");
+
+            var result = ReShadeInstallService.Uninstall(directory, GraphicsApi.D3D11);
+
+            Assert.True(result.Success);
+            Assert.False(File.Exists(Path.Combine(directory, OptiScalerService.ReShadeCoexistName)));
         }
 
         [Fact]
@@ -109,6 +134,7 @@ namespace HdrUpscaleManager.Tests
         public void ResolveTargetDllName_OptiScalerAlreadyInstalled_RedirectsToCoexistName()
         {
             WriteFile("OptiScaler.ini");
+            WriteFile("dxgi.dll", "optiscaler bytes");
 
             var target = ReShadeInstallService.ResolveTargetDllName(directory, "dxgi.dll");
 
