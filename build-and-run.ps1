@@ -13,10 +13,7 @@
          process supplies its own at runtime — shipping ours risks a load conflict)
        - extension.yaml
        - Resources\ (icon.png, etc.)
-  5. Relaunches Playnite via the "Desktop/Playnite" Steam shortcut so the new
-     build is loaded through Steam (matches how it's normally launched on this
-     machine — Steam overlay, controller input passthrough, etc), mirroring
-     playnite-eden-mod-manager's build-and-run.ps1.
+  5. Relaunches Playnite (standalone, %LOCALAPPDATA%\Playnite\Playnite.DesktopApp.exe).
 
 .PARAMETER NoRestart
   Skip closing/relaunching Playnite — just build and deploy.
@@ -33,12 +30,7 @@ param(
 $ErrorActionPreference = 'Stop'
 $root = $PSScriptRoot
 
-# steam://rungameid URL behind the "Playnite" shortcut on this machine's Desktop —
-# relaunching through Steam instead of the bare exe so it comes up the same way it
-# normally does (overlay, input, etc). Playnite itself is a non-Steam-game shortcut
-# here, not under %LOCALAPPDATA%\Playnite or on PATH, which is why a plain exe
-# lookup doesn't find it.
-$playniteSteamUrl = 'steam://rungameid/15319020825756041216'
+$playniteExe = Join-Path $env:LOCALAPPDATA 'Playnite\Playnite.DesktopApp.exe'
 
 # --- Close Playnite (its extension DLLs are locked while running) ---------
 $playniteProc = Get-Process Playnite* -ErrorAction SilentlyContinue
@@ -52,9 +44,17 @@ if ($playniteProc -and -not $NoRestart) {
 $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
 if (-not (Test-Path $vswhere)) { throw "vswhere.exe not found — is Visual Studio / Build Tools installed?" }
 
-$msbuild = & $vswhere -latest -products '*' `
+# Prefers VS 2022 (17.x): VS 18 Build Tools' SDK resolver can't resolve
+# Microsoft.NET.Sdk against the .NET 9 SDKs installed here (confirmed 2026-09-30,
+# MSB4236), while 2022's resolves them fine. Falls back to the newest install.
+$msbuild = & $vswhere -version '[17.0,18.0)' -products '*' `
     -requires Microsoft.Component.MSBuild `
     -find 'MSBuild\**\Bin\MSBuild.exe' | Select-Object -First 1
+if (-not $msbuild) {
+    $msbuild = & $vswhere -latest -products '*' `
+        -requires Microsoft.Component.MSBuild `
+        -find 'MSBuild\**\Bin\MSBuild.exe' | Select-Object -First 1
+}
 if (-not $msbuild) { throw "MSBuild.exe not found via vswhere." }
 Write-Host "MSBuild: $msbuild" -ForegroundColor DarkGray
 
@@ -76,8 +76,8 @@ if (Test-Path "$root\Resources") {
 
 Write-Host "Deployed to $dest" -ForegroundColor Green
 
-# --- Relaunch Playnite (via Steam, matching the Desktop/Playnite shortcut) --
+# --- Relaunch Playnite ------------------------------------------------------
 if (-not $NoRestart) {
-    Write-Host "Launching Playnite via Steam ($playniteSteamUrl)..." -ForegroundColor DarkGray
-    Start-Process $playniteSteamUrl
+    Write-Host "Launching Playnite ($playniteExe)..." -ForegroundColor DarkGray
+    Start-Process $playniteExe
 }
