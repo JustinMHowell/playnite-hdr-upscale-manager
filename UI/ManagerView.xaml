@@ -80,6 +80,9 @@
                             <Button Content="Install" Command="{Binding RenoDxInstallCommand}" AutomationProperties.AutomationId="RenoDxInstall"/>
                             <Button Content="Check update" Command="{Binding RenoDxUpdateCommand}" AutomationProperties.AutomationId="RenoDxCheckUpdate"/>
                             <Button Content="Uninstall" Command="{Binding RenoDxUninstallCommand}" AutomationProperties.AutomationId="RenoDxUninstall"/>
+                            <Button Content="Swap to previous build" Command="{Binding RenoDxSwapPreviousBuildCommand}" AutomationProperties.AutomationId="RenoDxSwapPreviousBuild"
+                                    ToolTip="Switch between the current RenoDX build and the one it replaced — for when a new snapshot breaks the game."
+                                    Visibility="{Binding HasPreviousRenoDxBuild, Converter={StaticResource BoolToVis}}"/>
                             <Button Content="Open link" Command="{Binding OpenRenoDxExternalUrlCommand}" AutomationProperties.AutomationId="RenoDxOpenLink"
                                     Visibility="{Binding RenoDxExternalUrl, Converter={StaticResource StringNotEmptyToVis}}"/>
                         </StackPanel>

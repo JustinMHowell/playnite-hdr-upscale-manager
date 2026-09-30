@@ -54,6 +54,15 @@ namespace HdrUpscaleManager.Services.Addons
         public string Error { get; set; }
     }
 
+    public class RenoDxSwapResult
+    {
+        public bool Success { get; set; }
+        public string Error { get; set; }
+        public List<string> SwappedFiles { get; set; } = new List<string>();
+        /* When the build now live was installed (its file's last-write time). */
+        public DateTime? NowActiveInstalledAt { get; set; }
+    }
+
     /* Generic (engine-wide, not per-game) RenoDX addon URLs, plus the wiki-matched per-game
        install path — both observed in RHI's WikiService. Generic addons remain the fallback
        for games the wiki doesn't have a dedicated build for. */
@@ -223,12 +232,76 @@ namespace HdrUpscaleManager.Services.Addons
             };
         }
 
+        /* Every RenoDX build AddonInstallService kept as "<addon>.previous" in the game's deploy
+           directory — generic engine installs included, which have no RenoDxInstalledRecord. */
+        public static List<string> FindPreviousBuilds(string gameInstallPath)
+        {
+            if (string.IsNullOrEmpty(gameInstallPath) || !Directory.Exists(gameInstallPath)) return new List<string>();
+
+            try
+            {
+                var deployDir = PeInspector.ResolveDeployDirectory(gameInstallPath);
+                return Directory.EnumerateFiles(deployDir, "renodx-*" + AddonInstallService.PreviousBuildSuffix)
+                    .Where(p => p.EndsWith(".addon64" + AddonInstallService.PreviousBuildSuffix, StringComparison.OrdinalIgnoreCase) ||
+                                p.EndsWith(".addon32" + AddonInstallService.PreviousBuildSuffix, StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+            }
+            catch (Exception ex)
+            {
+                Log.Warn(ex, $"Could not look for previous RenoDX builds under '{gameInstallPath}'.");
+                return new List<string>();
+            }
+        }
+
+        /* Swaps each live addon with its kept previous build rather than just restoring the old
+           one, so the newer build becomes the ".previous" and a second swap undoes the first. */
+        public static RenoDxSwapResult SwapToPreviousBuild(string gameInstallPath)
+        {
+            var previousBuilds = FindPreviousBuilds(gameInstallPath);
+            if (previousBuilds.Count == 0)
+                return new RenoDxSwapResult { Success = false, Error = "No previous RenoDX build is kept for this game." };
+
+            var result = new RenoDxSwapResult { Success = true };
+            foreach (var previousPath in previousBuilds)
+            {
+                var livePath = previousPath.Substring(0, previousPath.Length - AddonInstallService.PreviousBuildSuffix.Length);
+                var tempPath = livePath + ".swapping";
+                try
+                {
+                    if (File.Exists(livePath)) File.Move(livePath, tempPath);
+                    File.Move(previousPath, livePath);
+                    if (File.Exists(tempPath)) File.Move(tempPath, previousPath);
+
+                    result.SwappedFiles.Add(Path.GetFileName(livePath));
+                    result.NowActiveInstalledAt = File.GetLastWriteTime(livePath);
+                    Log.Info($"Swapped RenoDX '{livePath}' with its previous build.");
+                }
+                catch (Exception ex)
+                {
+                    // Put the live build back if the swap got partway.
+                    if (!File.Exists(livePath) && File.Exists(tempPath))
+                    {
+                        try { File.Move(tempPath, livePath); } catch (Exception restoreEx) { Log.Warn(restoreEx, $"Failed to restore '{livePath}'."); }
+                    }
+
+                    Log.Error(ex, $"Failed to swap RenoDX '{livePath}' with its previous build.");
+                    return new RenoDxSwapResult { Success = false, Error = $"Couldn't swap {Path.GetFileName(livePath)}: {ex.Message} (is the game still running?)" };
+                }
+            }
+
+            return result;
+        }
+
         public static RenoDxUninstallResult Uninstall(RenoDxInstalledRecord record)
         {
             try
             {
                 if (File.Exists(record.InstallPath))
                     File.Delete(record.InstallPath);
+
+                var previousPath = record.InstallPath + AddonInstallService.PreviousBuildSuffix;
+                if (File.Exists(previousPath))
+                    File.Delete(previousPath);
 
                 Log.Info($"Uninstalled RenoDX addon for '{record.GameName}' from '{record.InstallPath}'.");
                 return new RenoDxUninstallResult { Success = true };

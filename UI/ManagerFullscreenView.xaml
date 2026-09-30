@@ -213,6 +213,8 @@
                                           Checked="RenoDxToggle_Checked" Unchecked="RenoDxToggle_Unchecked"
                                           AutomationProperties.AutomationId="RenoDxToggle"/>
                                 <Button Content="Check update" Style="{StaticResource FsButton}" Command="{Binding RenoDxUpdateCommand}" AutomationProperties.AutomationId="RenoDxCheckUpdate" Margin="0,0,10,10"/>
+                                <Button Content="Swap to previous build" Style="{StaticResource FsButton}" Command="{Binding RenoDxSwapPreviousBuildCommand}" AutomationProperties.AutomationId="RenoDxSwapPreviousBuild" Margin="0,0,10,10"
+                                        Visibility="{Binding HasPreviousRenoDxBuild, Converter={StaticResource BoolToVis}}"/>
                                 <Button Content="Open link" Style="{StaticResource FsButton}" Command="{Binding OpenRenoDxExternalUrlCommand}" AutomationProperties.AutomationId="RenoDxOpenLink" Margin="0,0,10,10"
                                         Visibility="{Binding RenoDxExternalUrl, Converter={StaticResource StringNotEmptyToVis}}"/>
                             </WrapPanel>

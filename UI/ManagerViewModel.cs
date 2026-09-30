@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -130,6 +130,11 @@ namespace HdrUpscaleManager.UI
         private string renoDxExternalUrl;
         public string RenoDxExternalUrl { get => renoDxExternalUrl; private set => SetProperty(ref renoDxExternalUrl, value); }
 
+        /* Refreshed with the other statuses rather than computed per binding — finding the deploy
+           directory walks every .exe under the install folder, too slow for a CanExecute. */
+        private bool hasPreviousRenoDxBuild;
+        public bool HasPreviousRenoDxBuild { get => hasPreviousRenoDxBuild; private set => SetProperty(ref hasPreviousRenoDxBuild, value); }
+
         private string lumaStatus;
         public string LumaStatus { get => lumaStatus; private set => SetProperty(ref lumaStatus, value); }
 
@@ -189,6 +194,7 @@ namespace HdrUpscaleManager.UI
         public ICommand RenoDxInstallUnityCommand { get; }
         public ICommand RenoDxUpdateCommand { get; }
         public ICommand RenoDxUninstallCommand { get; }
+        public ICommand RenoDxSwapPreviousBuildCommand { get; }
         public ICommand OpenRenoDxExternalUrlCommand { get; }
 
         public ICommand LumaInstallCommand { get; }
@@ -252,6 +258,7 @@ namespace HdrUpscaleManager.UI
                 () => !IsBusy && CanInstallUnityRenoDx);
             RenoDxUpdateCommand = new RelayCommand(() => Run(CheckRenoDxUpdateAsync), () => !IsBusy && RenoDxRecords.Get(GameId) != null);
             RenoDxUninstallCommand = new RelayCommand(() => Run(UninstallRenoDxAsync), () => !IsBusy && RenoDxRecords.Get(GameId) != null);
+            RenoDxSwapPreviousBuildCommand = new RelayCommand(() => Run(SwapRenoDxPreviousBuildAsync), () => !IsBusy && HasPreviousRenoDxBuild);
             OpenRenoDxExternalUrlCommand = new RelayCommand(OpenRenoDxExternalUrl, () => RenoDxExternalUrl != null);
 
             LumaInstallCommand = new RelayCommand(() => Run(InstallLumaAsync), () => !IsBusy);
@@ -434,6 +441,7 @@ namespace HdrUpscaleManager.UI
             var renoDx = RenoDxRecords.Get(GameId);
             RenoDxStatus = renoDx != null ? $"Installed ({renoDx.MatchedWikiName ?? renoDx.AddonFileName})" : "Not installed.";
             IsRenoDxInstalled = renoDx != null;
+            HasPreviousRenoDxBuild = RenoDxService.FindPreviousBuilds(Game.InstallDirectory).Count > 0;
 
             var luma = LumaRecords.Get(GameId);
             var dgvoodoo2 = Dgvoodoo2Records.Get(GameId);
@@ -764,6 +772,29 @@ namespace HdrUpscaleManager.UI
                 StatusText = $"RenoDX install failed: {ex.Message}";
                 api.Dialogs.ShowErrorMessage(StatusText, "Install RenoDX");
             }
+        }
+
+        /* Escape hatch for a bad snapshot — RenoDX builds are always "latest", so without the
+           kept previous build a broken one leaves no way back (see AddonInstallService.KeepPreviousBuild). */
+        private async Task SwapRenoDxPreviousBuildAsync()
+        {
+            try
+            {
+                var result = RenoDxService.SwapToPreviousBuild(Game.InstallDirectory);
+                StatusText = result.Success
+                    ? $"Switched {string.Join(", ", result.SwappedFiles)} to the other kept build" +
+                      (result.NowActiveInstalledAt != null ? $" (installed {result.NowActiveInstalledAt.Value:g})" : "") +
+                      ". Use the same button again to switch back."
+                    : result.Error;
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, $"RenoDX build swap failed for '{GameName}'.");
+                StatusText = $"RenoDX build swap failed: {ex.Message}";
+                api.Dialogs.ShowErrorMessage(StatusText, "RenoDX");
+            }
+
+            await Task.CompletedTask;
         }
 
         private void SaveRenoDxRecord(RenoDxMatchedInstallResult result)

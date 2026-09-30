@@ -59,6 +59,7 @@ namespace HdrUpscaleManager.Services.Addons
             var targetPath = Path.Combine(deployDir, addonFileName);
             try
             {
+                KeepPreviousBuild(targetPath, bytes);
                 File.WriteAllBytes(targetPath, bytes);
             }
             catch (Exception ex)
@@ -76,6 +77,26 @@ namespace HdrUpscaleManager.Services.Addons
                 RemoteContentLength = contentLength,
                 RemoteLastModified = lastModified
             };
+        }
+
+        /* Suffix for the build an install replaced. ReShade only loads *.addon/*.addon64/*.addon32,
+           so the kept copy sits inert next to the live one until RenoDxService swaps them. */
+        public const string PreviousBuildSuffix = ".previous";
+
+        /* Snapshots are always "latest" — confirmed live 2026-09-30 that one UE-Extended snapshot
+           (v0.2026.930.407) crashed Atomic Heart and RuneScape: Dragonwilds on startup while the
+           prior day's build ran fine, and every reinstall had overwritten the only working copy.
+           Keeps the replaced file as <name>.previous, unless the download is byte-identical to
+           it (re-installing the same build must not discard an older, known-good backup). */
+        internal static void KeepPreviousBuild(string targetPath, byte[] newBytes)
+        {
+            if (!File.Exists(targetPath)) return;
+
+            var existing = new FileInfo(targetPath);
+            if (existing.Length == newBytes.Length && ComputeSha256(File.ReadAllBytes(targetPath)) == ComputeSha256(newBytes))
+                return;
+
+            File.Copy(targetPath, targetPath + PreviousBuildSuffix, overwrite: true);
         }
 
         /* HEAD request against a mod's current download URL — used to check for an update
