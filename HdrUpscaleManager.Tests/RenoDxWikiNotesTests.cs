@@ -103,6 +103,60 @@ namespace HdrUpscaleManager.Tests
         }
 
         [Fact]
+        public void PlanInstall_PerGameMod_IsDedicated()
+        {
+            var plan = RenoDxService.PlanInstall("Atlas Fallen (DX12)", Mods, null, RenoDxEngine.UnrealEngine, null);
+
+            Assert.Equal(RenoDxInstallPlanKind.DedicatedMod, plan.Kind);
+            Assert.Equal("Atlas Fallen (DX12)", plan.MatchedGameName);
+        }
+
+        [Fact]
+        public void PlanInstall_GameOnlyInEngineList_FallsBackToGenericEngineBuild()
+        {
+            var plan = RenoDxService.PlanInstall("Astroneer", Mods, null, RenoDxEngine.UnrealEngine, null);
+
+            Assert.Equal(RenoDxInstallPlanKind.GenericEngine, plan.Kind);
+            Assert.True(plan.UseUeExtended);
+            Assert.Contains("generic Unreal Engine (UE-Extended) build", plan.Describe());
+        }
+
+        [Fact]
+        public void PlanInstall_UnityGame_NeverUsesUeExtended()
+        {
+            var plan = RenoDxService.PlanInstall("7 Days to Die", Mods, null, RenoDxEngine.UnityEngine, null);
+
+            Assert.Equal(RenoDxInstallPlanKind.GenericEngine, plan.Kind);
+            Assert.False(plan.UseUeExtended);
+            Assert.Contains("generic Unity build", plan.Describe());
+        }
+
+        [Fact]
+        public void PlanInstall_NoMatchAndNoEngine_IsNoneAvailable()
+        {
+            var plan = RenoDxService.PlanInstall("Not A Real Game", Mods, null, null, null);
+
+            Assert.Equal(RenoDxInstallPlanKind.NoneAvailable, plan.Kind);
+        }
+
+        [Fact]
+        public void PlanInstall_ModWithOnlyANexusLink_IsExternalOnly()
+        {
+            var mods = new List<RenoDxWikiMod>
+            {
+                new RenoDxWikiMod { Name = "Nexus Game", Section = "Legend", NexusUrl = "https://www.nexusmods.com/x/mods/1" },
+                new RenoDxWikiMod { Name = "Linkless Game", Section = "Legend" }
+            };
+
+            var external = RenoDxService.PlanInstall("Nexus Game", mods, null, RenoDxEngine.UnityEngine, null);
+            var linkless = RenoDxService.PlanInstall("Linkless Game", mods, null, RenoDxEngine.UnityEngine, null);
+
+            Assert.Equal(RenoDxInstallPlanKind.DedicatedModExternalOnly, external.Kind);
+            Assert.Equal("Nexus Mods", external.ExternalUrlLabel);
+            Assert.Equal(RenoDxInstallPlanKind.DedicatedModNoDownload, linkless.Kind);
+        }
+
+        [Fact]
         public void IsEngineCompatEntry_NullSection_TreatedAsInstallableMod()
         {
             // Rows cached before Section existed must keep matching like they always did.

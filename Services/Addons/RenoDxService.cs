@@ -63,6 +63,46 @@ namespace HdrUpscaleManager.Services.Addons
         public DateTime? NowActiveInstalledAt { get; set; }
     }
 
+    public enum RenoDxInstallPlanKind
+    {
+        DedicatedMod,
+        DedicatedModExternalOnly,
+        DedicatedModNoDownload,
+        GenericEngine,
+        NoneAvailable
+    }
+
+    /* What the manager window's Install button would do for a game, worked out without
+       installing anything — see RenoDxService.PlanInstall. */
+    public class RenoDxInstallPlan
+    {
+        public RenoDxInstallPlanKind Kind { get; set; }
+        public string MatchedGameName { get; set; }
+        public string ExternalUrlLabel { get; set; }
+        public RenoDxEngine? Engine { get; set; }
+        public bool UseUeExtended { get; set; }
+
+        public string Describe()
+        {
+            switch (Kind)
+            {
+                case RenoDxInstallPlanKind.DedicatedMod:
+                    return $"Dedicated mod on the RenoDX wiki: \"{MatchedGameName}\" — Install uses its per-game build.";
+                case RenoDxInstallPlanKind.DedicatedModExternalOnly:
+                    return $"Dedicated mod on the RenoDX wiki: \"{MatchedGameName}\" — only distributed via {ExternalUrlLabel}, so Install can't download it automatically.";
+                case RenoDxInstallPlanKind.DedicatedModNoDownload:
+                    return $"Dedicated mod on the RenoDX wiki: \"{MatchedGameName}\" — listed, but it has no download link yet.";
+                case RenoDxInstallPlanKind.GenericEngine:
+                    var build = Engine == RenoDxEngine.UnrealEngine
+                        ? (UseUeExtended ? "Unreal Engine (UE-Extended)" : "Unreal Engine")
+                        : "Unity";
+                    return $"No dedicated mod on the RenoDX wiki — Install falls back to the generic {build} build.";
+                default:
+                    return "No dedicated mod on the RenoDX wiki, and the engine couldn't be detected from the game's files — Install can't pick a generic build; choose one below.";
+            }
+        }
+    }
+
     /* Generic (engine-wide, not per-game) RenoDX addon URLs, plus the wiki-matched per-game
        install path — both observed in RHI's WikiService. Generic addons remain the fallback
        for games the wiki doesn't have a dedicated build for. */
@@ -129,6 +169,45 @@ namespace HdrUpscaleManager.Services.Addons
 
             var installer = new AddonInstallService();
             return await installer.InstallAsync(gameInstallPath, addon.Url, addon.FileName).ConfigureAwait(false);
+        }
+
+        /* Dry run of the manager window's Install button: the same wiki match InstallForGameAsync
+           makes, then the same generic fallback. locallyDetectedEngine must be what
+           RenoDxEngineDetector found in the game's files — that fallback doesn't consult
+           PCGamingWiki. */
+        public static RenoDxInstallPlan PlanInstall(
+            string gameName,
+            IEnumerable<RenoDxWikiMod> mods,
+            IDictionary<string, string> wikiNameOverrides,
+            RenoDxEngine? locallyDetectedEngine,
+            RemoteManifest manifest)
+        {
+            var match = RenoDxGameMatcher.Match(gameName, mods, wikiNameOverrides);
+            if (match != null)
+            {
+                if (match.SnapshotUrl != null || match.SnapshotUrl32 != null)
+                    return new RenoDxInstallPlan { Kind = RenoDxInstallPlanKind.DedicatedMod, MatchedGameName = match.Name };
+
+                if (match.NexusUrl == null && match.DiscordUrl == null)
+                    return new RenoDxInstallPlan { Kind = RenoDxInstallPlanKind.DedicatedModNoDownload, MatchedGameName = match.Name };
+
+                return new RenoDxInstallPlan
+                {
+                    Kind = RenoDxInstallPlanKind.DedicatedModExternalOnly,
+                    MatchedGameName = match.Name,
+                    ExternalUrlLabel = match.NexusUrl != null ? "Nexus Mods" : "Discord"
+                };
+            }
+
+            if (locallyDetectedEngine == null)
+                return new RenoDxInstallPlan { Kind = RenoDxInstallPlanKind.NoneAvailable };
+
+            return new RenoDxInstallPlan
+            {
+                Kind = RenoDxInstallPlanKind.GenericEngine,
+                Engine = locallyDetectedEngine,
+                UseUeExtended = locallyDetectedEngine == RenoDxEngine.UnrealEngine && ShouldUseUeExtended(gameName, manifest)
+            };
         }
 
         /* Matches the game against RenoDX's wiki mod list before falling back to a generic

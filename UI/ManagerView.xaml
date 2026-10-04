@@ -74,6 +74,7 @@
                     <StackPanel>
                         <TextBlock Text="RenoDX" Style="{StaticResource SectionTitle}"/>
                         <TextBlock Text="{Binding RenoDxStatus}" Style="{StaticResource SectionStatus}"/>
+                        <TextBlock Text="{Binding RenoDxInstallPlanText}" Style="{StaticResource SectionStatus}" AutomationProperties.AutomationId="RenoDxInstallPlanText"/>
                         <TextBlock Text="{Binding RenoDxWikiNotesText}" Style="{StaticResource SectionStatus}" AutomationProperties.AutomationId="RenoDxWikiNotesText"
                                    Visibility="{Binding RenoDxWikiNotesText, Converter={StaticResource StringNotEmptyToVis}}"/>
                         <StackPanel Orientation="Horizontal">

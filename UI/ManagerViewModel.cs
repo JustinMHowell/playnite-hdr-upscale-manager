@@ -34,6 +34,10 @@ namespace HdrUpscaleManager.UI
            game isn't installed yet — a PCGamingWiki lookup fills the gap in the background, and
            these fields update in place once it returns (see RefreshDetectionFromPcGamingWikiAsync). */
         private RenoDxEngine? detectedRenoDxEngine;
+        /* What local detection alone found, before any PCGamingWiki answer is merged into
+           detectedRenoDxEngine — InstallRenoDxAsync's generic fallback only uses local detection,
+           so RenoDxInstallPlanText must predict from the same. */
+        private readonly RenoDxEngine? locallyDetectedRenoDxEngine;
         private GraphicsApi detectedDxvkApi;
         /* Same underlying detection as detectedDxvkApi, but for ReShade/RenoDX rather than
            DXVK — kept separate because DXVK's PCGamingWiki confidence check deliberately
@@ -53,6 +57,7 @@ namespace HdrUpscaleManager.UI
         private OptiScalerWikiData optiScalerWikiData;
         private bool optiScalerWikiLookupInProgress;
         private List<RenoDxWikiMod> renoDxWikiMods;
+        private bool renoDxWikiLookupInProgress;
 
         public Game Game { get; }
         public string GameName => Game.Name;
@@ -220,6 +225,7 @@ namespace HdrUpscaleManager.UI
             lumaPrerequisitesManifest = new LumaPrerequisitesManifestService(userDataPath).TryGetCachedManifest();
             detectedRenoDxEngine = RenoDxEngineDetector.Detect(
                 Game.InstallDirectory, GameName, cachedManifest?.InstallPathOverrides, cachedManifest?.EngineHintOverrides).Engine;
+            locallyDetectedRenoDxEngine = detectedRenoDxEngine;
 
             string graphicsApiOverrideRaw = null;
             cachedManifest?.GraphicsApiOverrides?.TryGetValue(GameName, out graphicsApiOverrideRaw);
@@ -294,11 +300,12 @@ namespace HdrUpscaleManager.UI
             _ = RefreshOptiScalerWikiAsync();
 
             renoDxWikiMods = new RenoDxWikiService(Path.Combine(userDataPath, "RenoDxWikiCache")).TryGetCachedMods();
+            renoDxWikiLookupInProgress = true;
             _ = RefreshRenoDxWikiAsync();
         }
 
-        /* Same shape as RefreshOptiScalerWikiAsync — cached notes already showed instantly via
-           TryGetCachedMods above; this only refreshes them. Purely informational. */
+        /* Same shape as RefreshOptiScalerWikiAsync — the cached match and notes already showed
+           instantly via TryGetCachedMods above; this only refreshes them. Purely informational. */
         private async Task RefreshRenoDxWikiAsync()
         {
             try
@@ -312,7 +319,28 @@ namespace HdrUpscaleManager.UI
             }
             finally
             {
+                renoDxWikiLookupInProgress = false;
+                OnPropertyChanged(nameof(RenoDxInstallPlanText));
                 OnPropertyChanged(nameof(RenoDxWikiNotesText));
+            }
+        }
+
+        /* Tells a dedicated per-game mod from a generic engine fallback before Install is
+           pressed. Predicts from the cached manifest, where the install itself re-fetches it. */
+        public string RenoDxInstallPlanText
+        {
+            get
+            {
+                if (renoDxWikiMods == null || renoDxWikiMods.Count == 0)
+                {
+                    return renoDxWikiLookupInProgress
+                        ? "Checking the RenoDX wiki for a dedicated mod…"
+                        : "Could not check the RenoDX wiki for a dedicated mod (no network and nothing cached yet).";
+                }
+
+                return RenoDxService
+                    .PlanInstall(GameName, renoDxWikiMods, cachedManifest?.WikiNameOverrides, locallyDetectedRenoDxEngine, cachedManifest)
+                    .Describe();
             }
         }
 

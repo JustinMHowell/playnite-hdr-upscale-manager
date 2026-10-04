@@ -205,6 +205,7 @@
                         <StackPanel Grid.Column="0">
                             <TextBlock Text="RenoDX" Style="{StaticResource FsSectionTitle}"/>
                             <TextBlock Text="{Binding RenoDxStatus}" Style="{StaticResource FsSectionStatus}"/>
+                            <TextBlock Text="{Binding RenoDxInstallPlanText}" Style="{StaticResource FsSectionStatus}" AutomationProperties.AutomationId="RenoDxInstallPlanText"/>
                             <TextBlock Text="{Binding RenoDxWikiNotesText}" Style="{StaticResource FsSectionStatus}" AutomationProperties.AutomationId="RenoDxWikiNotesText"
                                        Visibility="{Binding RenoDxWikiNotesText, Converter={StaticResource StringNotEmptyToVis}}"/>
                             <WrapPanel Margin="0,0,0,8">
