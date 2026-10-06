@@ -210,6 +210,18 @@ namespace HdrUpscaleManager.Services.Addons
             };
         }
 
+        /* Whether the wiki lists a per-game mod for this game, however it's distributed — the
+           library tag's criterion. Blacklisted games never count: nothing can be installed for
+           them, so tagging them would only mislead. */
+        public static bool HasDedicatedMod(
+            string gameName,
+            IEnumerable<RenoDxWikiMod> mods,
+            RemoteManifest manifest)
+        {
+            if (string.IsNullOrEmpty(gameName) || manifest?.IsBlacklisted(gameName) == true) return false;
+            return RenoDxGameMatcher.Match(gameName, mods, manifest?.WikiNameOverrides) != null;
+        }
+
         /* Matches the game against RenoDX's wiki mod list before falling back to a generic
            engine-wide addon would be needed — this is the same per-game coverage RHI gets from
            its wiki scrape, so games with a dedicated build get that build instead of the

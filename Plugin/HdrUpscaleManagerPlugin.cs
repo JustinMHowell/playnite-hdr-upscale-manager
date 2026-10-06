@@ -82,15 +82,39 @@ namespace HdrUpscaleManager.Plugin
                 MenuSection = "@HDR & Upscale Manager",
                 Action = async _ => await CheckManifestSyncAsync()
             };
+
+            yield return new MainMenuItem
+            {
+                Description = "Tag filtered games with a dedicated RenoDX mod",
+                MenuSection = "@HDR & Upscale Manager",
+                Action = _ => TagGamesWithDedicatedRenoDxMod(PlayniteApi.MainView.FilteredGames?.ToList())
+            };
         }
 
-        /* One entry, straight into the per-game window — every install/toggle/uninstall action
+        /* One entry straight into the per-game window — every install/toggle/uninstall action
            for every component (ReShade/RenoDX/Luma/DXVK/OptiScaler/HDR toggle) lives there
-           (ManagerViewModel), so there's nothing left for a right-click submenu to duplicate. */
+           (ManagerViewModel), so there's nothing left for a right-click submenu to duplicate —
+           plus the one action that works on a whole selection, installed or not. */
         public override IEnumerable<GameMenuItem> GetGameMenuItems(GetGameMenuItemsArgs args)
         {
-            var games = args.Games?.Where(g => !string.IsNullOrEmpty(g.InstallDirectory)).ToList()
-                ?? new List<Playnite.SDK.Models.Game>();
+            var selected = args.Games?.ToList() ?? new List<Playnite.SDK.Models.Game>();
+            if (selected.Count == 0) yield break;
+
+            foreach (var item in GetManagerWindowMenuItems(selected)) yield return item;
+
+            yield return new GameMenuItem
+            {
+                Description = selected.Count == 1
+                    ? "Tag if it has a dedicated RenoDX mod"
+                    : $"Tag the {selected.Count} selected games that have a dedicated RenoDX mod",
+                MenuSection = "HDR & Upscale Manager",
+                Action = _ => TagGamesWithDedicatedRenoDxMod(selected)
+            };
+        }
+
+        private IEnumerable<GameMenuItem> GetManagerWindowMenuItems(List<Playnite.SDK.Models.Game> selected)
+        {
+            var games = selected.Where(g => !string.IsNullOrEmpty(g.InstallDirectory)).ToList();
             if (games.Count == 0) yield break;
 
             var game = games[0];

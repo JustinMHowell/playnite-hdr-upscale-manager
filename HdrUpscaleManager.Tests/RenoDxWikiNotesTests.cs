@@ -157,6 +157,15 @@ namespace HdrUpscaleManager.Tests
         }
 
         [Fact]
+        public void HasDedicatedMod_OnlyForPerGameMods()
+        {
+            Assert.True(RenoDxService.HasDedicatedMod("Atlas Fallen (DX12)", Mods, null));
+            Assert.False(RenoDxService.HasDedicatedMod("Astroneer", Mods, null));
+            Assert.False(RenoDxService.HasDedicatedMod("Not A Real Game", Mods, null));
+            Assert.False(RenoDxService.HasDedicatedMod(null, Mods, null));
+        }
+
+        [Fact]
         public void IsEngineCompatEntry_NullSection_TreatedAsInstallableMod()
         {
             // Rows cached before Section existed must keep matching like they always did.
